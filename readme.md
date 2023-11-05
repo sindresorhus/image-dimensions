@@ -29,7 +29,7 @@ console.log(await imageDimensionsFromStream(body));
 
 ## API
 
-### `imageDimensionsFromStream(stream: ReadableStream): Promise<{width: number; height: number} | undefined>`
+### `imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<{width: number; height: number} | undefined>`
 
 Get the dimensions of an image by reading the least amount of data.
 
@@ -61,7 +61,7 @@ import {imageDimensionsFromData} from 'image-dimensions';
 
 const data = getImage();
 
-console.log(imageDimensions(data));
+console.log(imageDimensionsFromData(data));
 //=> {width: 1920, height: 1080}
 ```
 

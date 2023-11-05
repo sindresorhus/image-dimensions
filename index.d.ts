@@ -48,7 +48,7 @@ import {imageDimensionsFromData} from 'image-dimensions';
 
 const data = getImage();
 
-console.log(imageDimensions(data));
+console.log(imageDimensionsFromData(data));
 //=> {width: 1920, height: 1080}
 ```
 */
