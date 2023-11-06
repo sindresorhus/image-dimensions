@@ -36,6 +36,10 @@ test('jpg - progressive', t => {
 	matches(t, 'progressive.jpg', {width: 40, height: 27});
 });
 
+test('gif', t => {
+	matches(t, 'valid.gif', {width: 30, height: 17});
+});
+
 test('imageDimensionsFromStream', async t => {
 	const stream = fs.createReadStream('fixtures/valid.png');
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
