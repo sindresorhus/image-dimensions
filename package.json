@@ -46,7 +46,8 @@
 		"cli-app",
 		"png",
 		"jpeg",
-		"jpg"
+		"jpg",
+		"gif"
 	],
 	"devDependencies": {
 		"ava": "^5.3.1",
