@@ -1,7 +1,7 @@
 {
 	"name": "image-dimensions",
 	"version": "2.0.0",
-	"description": "Get the dimensions of a PNG or JPEG image",
+	"description": "Get the dimensions of an image",
 	"license": "MIT",
 	"repository": "sindresorhus/image-dimensions",
 	"funding": "https://github.com/sponsors/sindresorhus",
@@ -46,7 +46,8 @@
 		"cli-app",
 		"png",
 		"jpeg",
-		"jpg"
+		"jpg",
+		"gif"
 	],
 	"devDependencies": {
 		"ava": "^5.3.1",
