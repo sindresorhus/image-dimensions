@@ -9,38 +9,58 @@ const matches = (t, filename, dimensions) => {
 };
 
 test('png', t => {
-	matches(t, 'valid.png', {width: 30, height: 20});
+	matches(t, 'png/valid.png', {width: 30, height: 20});
 });
 
 test('png - minified', t => {
-	matches(t, 'minified.png', {width: 30, height: 20});
+	matches(t, 'png/minified.png', {width: 30, height: 20});
 });
 
 test('png - apple minified', t => {
-	matches(t, 'apple-minified.png', {width: 30, height: 20});
+	matches(t, 'png/apple-minified.png', {width: 30, height: 20});
 });
 
 test('png - invalid', t => {
-	matches(t, 'invalid.png', undefined);
+	matches(t, 'png/invalid.png', undefined);
+});
+
+test('png - animated', t => {
+	matches(t, 'png/animated.png', {width: 30, height: 17});
 });
 
 test('jpg', t => {
-	matches(t, 'valid.jpg', {width: 200, height: 133});
+	matches(t, 'jpeg/valid.jpg', {width: 200, height: 133});
 });
 
 test('jpg - no exif', t => {
-	matches(t, 'no-exif.jpg', {width: 200, height: 133});
+	matches(t, 'jpeg/no-exif.jpg', {width: 200, height: 133});
 });
 
 test('jpg - progressive', t => {
-	matches(t, 'progressive.jpg', {width: 40, height: 27});
+	matches(t, 'jpeg/progressive.jpg', {width: 40, height: 27});
 });
 
 test('gif', t => {
-	matches(t, 'valid.gif', {width: 30, height: 17});
+	matches(t, 'gif/valid.gif', {width: 30, height: 17});
+});
+
+test.failing('jpeg xl', t => {
+	matches(t, 'jpeg xl/valid.jxl', {width: 30, height: 17});
+});
+
+test.failing('avif', t => {
+	matches(t, 'avif/valid.avif', {width: 30, height: 17});
+});
+
+test.failing('heic', t => {
+	matches(t, 'heic/valid.heic', {width: 30, height: 17});
+});
+
+test.failing('webp', t => {
+	matches(t, 'webp/valid.webp', {width: 30, height: 17});
 });
 
 test('imageDimensionsFromStream', async t => {
-	const stream = fs.createReadStream('fixtures/valid.png');
+	const stream = fs.createReadStream('fixtures/png/valid.png');
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
 });
