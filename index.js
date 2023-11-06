@@ -6,7 +6,10 @@ export function imageDimensionsFromData(bytes) {
 	// Prevent issues with Buffer being passed. Seems to be an issue on Node.js 20 and later.
 	bytes = new Uint8Array(bytes);
 
-	return png(bytes) ?? jpeg(bytes) ?? gif(bytes);
+	// Note: Place types that can be detected fast first.
+	return png(bytes)
+		?? gif(bytes)
+		?? jpeg(bytes);
 }
 
 export async function imageDimensionsFromStream(stream) {
