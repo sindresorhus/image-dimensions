@@ -1,3 +1,5 @@
+// Specification: https://developers.google.com/speed/webp/docs/riff_container
+
 const isWebp = bytes =>
 	// RIFF
 	bytes[0] === 0x52
@@ -32,11 +34,11 @@ const isVP8Extended = bytes =>
 	&& bytes[15] === 0x58;
 
 function readUInt24LE(dataView, offset) {
-	const byte1 = dataView.getUint8(offset, true);
-	const byte2 = dataView.getUint8(offset + 1, true);
-	const byte3 = dataView.getUint8(offset + 2, true);
+	const byte1 = dataView.getUint8(offset);
+	const byte2 = dataView.getUint8(offset + 1);
+	const byte3 = dataView.getUint8(offset + 2);
 
-	// Combine the three bytes into a 24-bit integer
+	// Combine the three bytes into a 24-bit integer.
 	// eslint-disable-next-line no-bitwise
 	return (byte3 << 16) | (byte2 << 8) | byte1;
 }
