@@ -56,8 +56,20 @@ test.failing('heic', t => {
 	matches(t, 'heic/valid.heic', {width: 30, height: 17});
 });
 
-test.failing('webp', t => {
-	matches(t, 'webp/valid.webp', {width: 30, height: 17});
+test('webp - vp8', t => {
+	matches(t, 'webp/vp8.webp', {width: 30, height: 20});
+});
+
+test('webp - vp8l', t => {
+	matches(t, 'webp/vp8l.webp', {width: 30, height: 20});
+});
+
+test('webp - vp8x', t => {
+	matches(t, 'webp/vp8x.webp', {width: 30, height: 20});
+});
+
+test('webp - animated', t => {
+	matches(t, 'webp/animated.webp', {width: 30, height: 17});
 });
 
 test('imageDimensionsFromStream', async t => {
