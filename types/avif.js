@@ -1,3 +1,5 @@
+// Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
+
 const isAvif = bytes =>
 	// `ftypavif` magic bytes
 	bytes[4] === 0x66
