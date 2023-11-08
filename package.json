@@ -48,7 +48,8 @@
 		"png",
 		"jpeg",
 		"jpg",
-		"gif"
+		"gif",
+		"webp"
 	],
 	"devDependencies": {
 		"ava": "^5.3.1",
