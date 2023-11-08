@@ -48,8 +48,8 @@ test.failing('jpeg xl', t => {
 	matches(t, 'jpeg xl/valid.jxl', {width: 30, height: 17});
 });
 
-test.failing('avif', t => {
-	matches(t, 'avif/valid.avif', {width: 30, height: 17});
+test('avif', t => {
+	matches(t, 'avif/valid.avif', {width: 30, height: 20});
 });
 
 test.failing('heic', t => {
