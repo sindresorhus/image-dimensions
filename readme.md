@@ -4,7 +4,7 @@
 
 *Works in any modern JavaScript environment (browsers, Node.js, Bun, Deno, etc).*
 
-Supporting all kinds of image formats is a non-goal. However, pull requests for adding JPEG XL, HEIC, and AVIF formats are welcome.
+Supporting all kinds of image formats is a non-goal. However, pull requests for adding JPEG XL, and HEIC formats are welcome.
 
 ## Supported formats
 
@@ -12,6 +12,7 @@ Supporting all kinds of image formats is a non-goal. However, pull requests for 
 - PNG (and APNG)
 - GIF
 - WebP
+- AVIF
 
 ## Install
 
