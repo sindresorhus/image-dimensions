@@ -90,6 +90,7 @@ npx image-dimensions unicorn.png
 - Smaller
 - Works in non-Node.js environments like the browser
 - Does not include unnecessary APIs for file reading
+- Supports the AVIF image format
 
 **Advantages of `image-size`**
 
