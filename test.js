@@ -72,6 +72,18 @@ test('webp - animated', t => {
 	matches(t, 'webp/animated.webp', {width: 30, height: 17});
 });
 
+test('svg', t => {
+	matches(t, 'svg/valid.svg', {width: 500, height: 300});
+});
+
+test('svg minified', t => {
+	matches(t, 'svg/minified.svg', {width: 500, height: 300});
+});
+
+test('svg invalid', t => {
+	matches(t, 'svg/invalid.svg', undefined);
+});
+
 test('imageDimensionsFromStream', async t => {
 	const stream = fs.createReadStream('fixtures/png/valid.png');
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});

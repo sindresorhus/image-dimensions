@@ -3,6 +3,7 @@ import jpeg from './types/jpeg.js';
 import gif from './types/gif.js';
 import webp from './types/webp.js';
 import avif from './types/avif.js';
+import svg from './types/svg.js';
 
 export function imageDimensionsFromData(bytes) {
 	// Prevent issues with Buffer being passed. Seems to be an issue on Node.js 20 and later.
@@ -13,7 +14,8 @@ export function imageDimensionsFromData(bytes) {
 		?? gif(bytes)
 		?? jpeg(bytes)
 		?? webp(bytes)
-		?? avif(bytes);
+		?? avif(bytes)
+		?? svg(bytes);
 }
 
 export async function imageDimensionsFromStream(stream) {

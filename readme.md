@@ -13,6 +13,7 @@ Supporting all kinds of image formats is a non-goal. However, pull requests for 
 - GIF
 - WebP
 - AVIF
+- SVG
 
 ## Install
 
