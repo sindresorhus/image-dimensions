@@ -17,9 +17,10 @@ export function imageDimensionsFromData(bytes) {
 			?? avif(bytes);
 	} catch (error) {
 		if (error instanceof RangeError) {
-			// error from DataView methods
+			// Error from DataView methods
 			return;
 		}
+
 		throw error;
 	}
 }
