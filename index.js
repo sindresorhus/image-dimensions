@@ -8,21 +8,12 @@ export function imageDimensionsFromData(bytes) {
 	// Prevent issues with Buffer being passed. Seems to be an issue on Node.js 20 and later.
 	bytes = new Uint8Array(bytes);
 
-	try {
-		// Note: Place types that can be detected fast first.
-		return png(bytes)
-			?? gif(bytes)
-			?? jpeg(bytes)
-			?? webp(bytes)
-			?? avif(bytes);
-	} catch (error) {
-		if (error instanceof RangeError) {
-			// Error from DataView methods
-			return;
-		}
-
-		throw error;
-	}
+	// Note: Place types that can be detected fast first.
+	return png(bytes)
+		?? gif(bytes)
+		?? jpeg(bytes)
+		?? webp(bytes)
+		?? avif(bytes);
 }
 
 export async function imageDimensionsFromStream(stream) {

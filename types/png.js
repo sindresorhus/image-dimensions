@@ -1,3 +1,5 @@
+import {getUint32} from '../utils.js';
+
 const isPng = bytes =>
 	bytes[0] === 0x89
 	&& bytes[1] === 0x50
@@ -23,8 +25,15 @@ export default function png(bytes) {
 	const dataView = new DataView(bytes.buffer);
 	const isAppleMinified = isAppleMinifiedPng(bytes);
 
+	const width = getUint32(dataView, isAppleMinified ? 32 : 16, false);
+	const height = getUint32(dataView, isAppleMinified ? 36 : 20, false);
+
+	if (width === undefined || height === undefined) {
+		return;
+	}
+
 	return {
-		width: dataView.getUint32(isAppleMinified ? 32 : 16, false),
-		height: dataView.getUint32(isAppleMinified ? 36 : 20, false),
+		width,
+		height,
 	};
 }

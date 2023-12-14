@@ -1,3 +1,5 @@
+import {isValidOffsetToRead, getUint32} from '../utils.js';
+
 // Specification: https://developers.google.com/speed/webp/docs/riff_container
 
 const isWebp = bytes =>
@@ -52,6 +54,10 @@ export default function webp(bytes) {
 	const maxSize = 0x3F_FF;
 
 	if (isVP8Lossy(bytes)) {
+		if (!isValidOffsetToRead(dataView, 28, 2)) {
+			return;
+		}
+
 		return {
 			// eslint-disable-next-line no-bitwise
 			width: dataView.getUint16(26, true) & maxSize,
@@ -61,7 +67,11 @@ export default function webp(bytes) {
 	}
 
 	if (isVP8Lossless(bytes)) {
-		const bits = dataView.getUint32(21, true);
+		const bits = getUint32(dataView, 21, true);
+
+		if (bits === undefined) {
+			return;
+		}
 
 		return {
 			// eslint-disable-next-line no-bitwise
@@ -72,6 +82,10 @@ export default function webp(bytes) {
 	}
 
 	if (isVP8Extended(bytes)) {
+		if (!isValidOffsetToRead(dataView, 27, 3)) {
+			return;
+		}
+
 		return {
 			width: readUInt24LE(dataView, 24) + 1,
 			height: readUInt24LE(dataView, 27) + 1,

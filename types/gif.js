@@ -1,3 +1,5 @@
+import {getUint16} from '../utils.js';
+
 const isGif = bytes =>
 	bytes[0] === 0x47
 	&& bytes[1] === 0x49
@@ -13,8 +15,15 @@ export default function gif(bytes) {
 
 	const dataView = new DataView(bytes.buffer);
 
+	const width = getUint16(dataView, 6, true);
+	const height = getUint16(dataView, 8, true);
+
+	if (width === undefined || height === undefined) {
+		return;
+	}
+
 	return {
-		width: dataView.getUint16(6, true),
-		height: dataView.getUint16(8, true),
+		width,
+		height,
 	};
 }

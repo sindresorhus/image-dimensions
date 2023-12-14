@@ -1,3 +1,5 @@
+import {isValidOffsetToRead, getUint16} from '../utils.js';
+
 const SOF0 = 0xFF_C0;
 const SOF3 = 0xFF_C3;
 
@@ -15,22 +17,30 @@ export default function jpeg(bytes) {
 
 	let offset = 2; // Start after the SOI marker.
 
-	while (offset < dataView.byteLength - 1) {
+	while (isValidOffsetToRead(dataView, offset, 2)) {
 		const marker = dataView.getUint16(offset);
 		offset += 2; // Move past the marker.
 
 		if (marker >= SOF0 && marker <= SOF3) {
+			const height = getUint16(dataView, offset + 3, false);
+			const width = getUint16(dataView, offset + 5, false);
+
+			if (height === undefined || width === undefined) {
+				return;
+			}
+
 			return {
-				height: dataView.getUint16(offset + 3, false),
-				width: dataView.getUint16(offset + 5, false),
+				height,
+				width,
 			};
 		}
 
-		if (dataView.byteLength - offset < 2) {
+		const segmentLength = getUint16(dataView, offset);
+
+		if (segmentLength === undefined) {
 			return; // Unexpected EOF when reading segment length.
 		}
 
-		const segmentLength = dataView.getUint16(offset);
 		offset += segmentLength; // Skip over the segment.
 
 		if (offset > dataView.byteLength) {
