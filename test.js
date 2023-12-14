@@ -76,3 +76,9 @@ test('imageDimensionsFromStream', async t => {
 	const stream = fs.createReadStream('fixtures/png/valid.png');
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
 });
+
+test('empty', t => {
+	t.notThrows(() => {
+		imageDimensionsFromData(new Uint8Array());
+	});
+});
