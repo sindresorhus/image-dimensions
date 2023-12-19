@@ -72,6 +72,11 @@ test('webp - animated', t => {
 	matches(t, 'webp/animated.webp', {width: 30, height: 17});
 });
 
+test('imageDimensionsFromData - error handling on DataView methods', t => {
+	const data = fs.readFileSync('fixtures/png/valid.png').subarray(0, 20);
+	t.is(imageDimensionsFromData(data), undefined);
+});
+
 test('imageDimensionsFromStream', async t => {
 	const stream = fs.createReadStream('fixtures/png/valid.png');
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});

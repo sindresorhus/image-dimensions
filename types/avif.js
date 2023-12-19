@@ -1,3 +1,5 @@
+import {getUint32} from '../utils.js';
+
 // Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
 
 const isAvif = bytes =>
@@ -26,12 +28,12 @@ export default function avif(bytes) {
 }
 
 function unbox(data, offset) {
-	if (data.length < 4 + offset) {
+	const dataView = new DataView(data.buffer);
+	const size = getUint32(dataView, offset);
+
+	if (size === undefined) {
 		return;
 	}
-
-	const dataView = new DataView(data.buffer);
-	const size = dataView.getUint32(offset);
 
 	// Size includes the first 4 bytes (length)
 	if (data.length < size + offset || size < 8) {
@@ -120,9 +122,16 @@ function parseIpcoBox(data, sizes) {
 		// Image Spatial Extent
 		if (box.type === 'ispe') {
 			const dataView = new DataView(box.data.buffer);
+			const width = getUint32(dataView, 4);
+			const height = getUint32(dataView, 8);
+
+			if (width === undefined || height === undefined) {
+				return;
+			}
+
 			sizes.push({
-				width: dataView.getUint32(4),
-				height: dataView.getUint32(8),
+				width,
+				height,
 			});
 		}
 
