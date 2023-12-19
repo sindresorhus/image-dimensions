@@ -1,4 +1,4 @@
-import {isValidOffsetToRead, getUint32} from '../utils.js';
+import {isValidOffsetToRead, getUint32} from '../utilities.js';
 
 // Specification: https://developers.google.com/speed/webp/docs/riff_container
 

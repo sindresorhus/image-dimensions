@@ -1,4 +1,4 @@
-import {getUint32} from '../utils.js';
+import {getUint32} from '../utilities.js';
 
 // Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
 

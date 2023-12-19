@@ -1,4 +1,4 @@
-import {getUint16} from '../utils.js';
+import {getUint16} from '../utilities.js';
 
 const isGif = bytes =>
 	bytes[0] === 0x47

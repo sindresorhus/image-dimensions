@@ -1,4 +1,4 @@
-import {getUint32} from '../utils.js';
+import {getUint32} from '../utilities.js';
 
 const isPng = bytes =>
 	bytes[0] === 0x89

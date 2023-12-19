@@ -1,4 +1,4 @@
-import {isValidOffsetToRead, getUint16} from '../utils.js';
+import {isValidOffsetToRead, getUint16} from '../utilities.js';
 
 const SOF0 = 0xFF_C0;
 const SOF3 = 0xFF_C3;
