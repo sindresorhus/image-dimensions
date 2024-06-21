@@ -50,7 +50,7 @@ Returns the image dimensions, or `undefined` if the image format is not supporte
 import {createReadStream} from 'node:fs';
 import {imageDimensionsFromStream} from 'image-dimensions';
 
-const stream = createReadStream('unicorn.png');
+const stream = ReadableStream.from(createReadStream('unicorn.png'));
 
 console.log(await imageDimensionsFromStream(stream));
 //=> {width: 1920, height: 1080}

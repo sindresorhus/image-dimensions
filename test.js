@@ -77,8 +77,13 @@ test('imageDimensionsFromData - error handling on DataView methods', t => {
 	t.is(imageDimensionsFromData(data), undefined);
 });
 
-test('imageDimensionsFromStream', async t => {
+test('imageDimensionsFromStream - Node.js stream', async t => {
 	const stream = fs.createReadStream('fixtures/png/valid.png');
+	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
+});
+
+test('imageDimensionsFromStream - web stream', async t => {
+	const stream = ReadableStream.from(fs.createReadStream('fixtures/png/valid.png'));
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
 });
 

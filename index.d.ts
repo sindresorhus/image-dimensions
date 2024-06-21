@@ -26,7 +26,7 @@ console.log(await imageDimensionsFromStream(body));
 import {createReadStream} from 'node:fs';
 import {imageDimensionsFromStream} from 'image-dimensions';
 
-const stream = createReadStream('unicorn.png');
+const stream = ReadableStream.from(createReadStream('unicorn.png'));
 
 console.log(await imageDimensionsFromStream(stream));
 //=> {width: 1920, height: 1080}
