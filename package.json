@@ -51,7 +51,9 @@
 		"jpg",
 		"gif",
 		"webp",
-		"avif"
+		"avif",
+		"heic",
+		"heif"
 	],
 	"devDependencies": {
 		"ava": "^6.0.1",

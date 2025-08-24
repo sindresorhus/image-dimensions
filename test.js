@@ -52,8 +52,8 @@ test('avif', t => {
 	matches(t, 'avif/valid.avif', {width: 30, height: 20});
 });
 
-test.failing('heic', t => {
-	matches(t, 'heic/valid.heic', {width: 30, height: 17});
+test('heic', t => {
+	matches(t, 'heic/valid.heic', {width: 30, height: 20});
 });
 
 test('webp - vp8', t => {
