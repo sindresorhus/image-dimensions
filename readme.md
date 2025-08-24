@@ -4,7 +4,7 @@
 
 *Works in any modern JavaScript environment (browsers, Node.js, Bun, Deno, etc).*
 
-Supporting all kinds of image formats is a non-goal. However, pull requests for adding JPEG XL and HEIC formats are welcome.
+Supporting all kinds of image formats is a non-goal. However, pull requests for adding JPEG XL are welcome.
 
 ## Supported formats
 
@@ -13,6 +13,7 @@ Supporting all kinds of image formats is a non-goal. However, pull requests for 
 - GIF
 - WebP
 - AVIF
+- HEIF (including HEIC)
 
 ## Install
 
@@ -45,6 +46,8 @@ Prefer this method.
 
 Returns the image dimensions, or `undefined` if the image format is not supported or the image data is invalid.
 
+Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
+
 ```js
 // Node.js example
 import {createReadStream} from 'node:fs';
@@ -63,6 +66,8 @@ Get the dimensions of an image from data.
 This method can be useful if you already have the image loaded in memory.
 
 Returns the image dimensions, or `undefined` if the image format is not supported or the image data is invalid.
+
+Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
 
 ```js
 import {imageDimensionsFromData} from 'image-dimensions';
@@ -90,11 +95,9 @@ npx image-dimensions unicorn.png
 - Smaller
 - Works in non-Node.js environments like the browser
 - Does not include unnecessary APIs for file reading
-- Supports the AVIF image format
 
 **Advantages of `image-size`**
 
-- More mature
 - Supports more image formats
 - Supports getting JPEG image orientation
 

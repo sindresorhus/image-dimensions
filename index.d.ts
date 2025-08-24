@@ -6,6 +6,8 @@ Prefer this method.
 @param stream - The image data.
 @returns The image dimensions, or `undefined` if the image format is not supported or the image data is invalid.
 
+Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
+
 @example
 ```
 import {imageDimensionsFromStream} from 'image-dimensions';
@@ -41,6 +43,8 @@ Use this method if you already have the image loaded in memory.
 
 @param data - The image data.
 @returns The image dimensions, or `undefined` if the image format is not supported or the image data is invalid.
+
+Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
 
 @example
 ```
