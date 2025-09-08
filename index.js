@@ -24,12 +24,16 @@ export function imageDimensionsFromData(bytes) {
 }
 
 export async function imageDimensionsFromStream(stream) {
-	const chunks = [];
+	let buffer = new Uint8Array(0);
 
 	for await (const chunk of stream) {
-		chunks.push(...chunk);
+		// Merge chunks
+		const newBuffer = new Uint8Array(buffer.length + chunk.length);
+		newBuffer.set(buffer);
+		newBuffer.set(chunk, buffer.length);
+		buffer = newBuffer;
 
-		const dimensions = imageDimensionsFromData(new Uint8Array(chunks));
+		const dimensions = imageDimensionsFromData(buffer);
 		if (dimensions) {
 			return dimensions;
 		}
