@@ -35,5 +35,6 @@ export default function png(bytes) {
 	return {
 		width,
 		height,
+		type: 'png',
 	};
 }

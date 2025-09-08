@@ -63,6 +63,7 @@ export default function webp(bytes) {
 			width: dataView.getUint16(26, true) & maxSize,
 			// eslint-disable-next-line no-bitwise
 			height: dataView.getUint16(28, true) & maxSize,
+			type: 'webp',
 		};
 	}
 
@@ -78,6 +79,7 @@ export default function webp(bytes) {
 			width: (bits & maxSize) + 1,
 			// eslint-disable-next-line no-bitwise
 			height: ((bits >> 14) & maxSize) + 1,
+			type: 'webp',
 		};
 	}
 
@@ -89,6 +91,7 @@ export default function webp(bytes) {
 		return {
 			width: readUInt24LE(dataView, 24) + 1,
 			height: readUInt24LE(dataView, 27) + 1,
+			type: 'webp',
 		};
 	}
 }

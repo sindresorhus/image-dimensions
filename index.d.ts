@@ -1,4 +1,9 @@
 /**
+Supported image format types.
+*/
+export type ImageType = 'png' | 'jpeg' | 'gif' | 'webp' | 'avif' | 'heic';
+
+/**
 Get the dimensions of an image by reading the least amount of data.
 
 Prefer this method.
@@ -19,7 +24,7 @@ const url = 'https://sindresorhus.com/unicorn';
 const {body} = await fetch(url);
 
 console.log(await imageDimensionsFromStream(body));
-//=> {width: 1920, height: 1080}
+//=> {width: 1920, height: 1080, type: 'png'}
 ```
 
 @example
@@ -31,10 +36,10 @@ import {imageDimensionsFromStream} from 'image-dimensions';
 const stream = ReadableStream.from(createReadStream('unicorn.png'));
 
 console.log(await imageDimensionsFromStream(stream));
-//=> {width: 1920, height: 1080}
+//=> {width: 1920, height: 1080, type: 'png'}
 ```
 */
-export function imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<{width: number; height: number} | undefined>;
+export function imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<{width: number; height: number; type: ImageType} | undefined>;
 
 /**
 Get the dimensions of an image.
@@ -53,7 +58,7 @@ import {imageDimensionsFromData} from 'image-dimensions';
 const data = getImage();
 
 console.log(imageDimensionsFromData(data));
-//=> {width: 1920, height: 1080}
+//=> {width: 1920, height: 1080, type: 'png'}
 ```
 */
-export function imageDimensionsFromData(data: Uint8Array): {width: number; height: number} | undefined;
+export function imageDimensionsFromData(data: Uint8Array): {width: number; height: number; type: ImageType} | undefined;

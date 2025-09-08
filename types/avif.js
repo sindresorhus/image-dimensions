@@ -29,5 +29,8 @@ export default function avif(bytes) {
 		return;
 	}
 
-	return getLargestAreaSize(sizes);
+	return {
+		...getLargestAreaSize(sizes),
+		type: 'avif',
+	};
 }

@@ -32,6 +32,7 @@ export default function jpeg(bytes) {
 			return {
 				height,
 				width,
+				type: 'jpeg',
 			};
 		}
 

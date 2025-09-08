@@ -36,5 +36,8 @@ export default function heic(bytes) {
 		return;
 	}
 
-	return getLargestAreaSize(sizes);
+	return {
+		...getLargestAreaSize(sizes),
+		type: 'heic',
+	};
 }

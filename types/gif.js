@@ -25,5 +25,6 @@ export default function gif(bytes) {
 	return {
 		width,
 		height,
+		type: 'gif',
 	};
 }

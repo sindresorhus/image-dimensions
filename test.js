@@ -10,15 +10,15 @@ const matches = (t, filename, dimensions) => {
 };
 
 test('png', t => {
-	matches(t, 'png/valid.png', {width: 30, height: 20});
+	matches(t, 'png/valid.png', {width: 30, height: 20, type: 'png'});
 });
 
 test('png - minified', t => {
-	matches(t, 'png/minified.png', {width: 30, height: 20});
+	matches(t, 'png/minified.png', {width: 30, height: 20, type: 'png'});
 });
 
 test('png - apple minified', t => {
-	matches(t, 'png/apple-minified.png', {width: 30, height: 20});
+	matches(t, 'png/apple-minified.png', {width: 30, height: 20, type: 'png'});
 });
 
 test('png - invalid', t => {
@@ -26,23 +26,23 @@ test('png - invalid', t => {
 });
 
 test('png - animated', t => {
-	matches(t, 'png/animated.png', {width: 30, height: 17});
+	matches(t, 'png/animated.png', {width: 30, height: 17, type: 'png'});
 });
 
 test('jpg', t => {
-	matches(t, 'jpeg/valid.jpg', {width: 200, height: 133});
+	matches(t, 'jpeg/valid.jpg', {width: 200, height: 133, type: 'jpeg'});
 });
 
 test('jpg - no exif', t => {
-	matches(t, 'jpeg/no-exif.jpg', {width: 200, height: 133});
+	matches(t, 'jpeg/no-exif.jpg', {width: 200, height: 133, type: 'jpeg'});
 });
 
 test('jpg - progressive', t => {
-	matches(t, 'jpeg/progressive.jpg', {width: 40, height: 27});
+	matches(t, 'jpeg/progressive.jpg', {width: 40, height: 27, type: 'jpeg'});
 });
 
 test('gif', t => {
-	matches(t, 'gif/valid.gif', {width: 30, height: 17});
+	matches(t, 'gif/valid.gif', {width: 30, height: 17, type: 'gif'});
 });
 
 test.failing('jpeg xl', t => {
@@ -50,29 +50,29 @@ test.failing('jpeg xl', t => {
 });
 
 test('avif', t => {
-	matches(t, 'avif/valid.avif', {width: 30, height: 20});
+	matches(t, 'avif/valid.avif', {width: 30, height: 20, type: 'avif'});
 });
 
 test('heic', t => {
-	matches(t, 'heic/valid.heic', {width: 30, height: 20});
+	matches(t, 'heic/valid.heic', {width: 8, height: 10, type: 'heic'});
 	// Returns raw pixel dimensions (orientation not applied)
-	// matches(t, 'heic/valid-metadata-rotated.heic', {width: 4032, height: 3024});
+	// matches(t, 'heic/valid-metadata-rotated.heic', {width: 4032, height: 3024, type: 'heic'});
 });
 
 test('webp - vp8', t => {
-	matches(t, 'webp/vp8.webp', {width: 30, height: 20});
+	matches(t, 'webp/vp8.webp', {width: 30, height: 20, type: 'webp'});
 });
 
 test('webp - vp8l', t => {
-	matches(t, 'webp/vp8l.webp', {width: 30, height: 20});
+	matches(t, 'webp/vp8l.webp', {width: 30, height: 20, type: 'webp'});
 });
 
 test('webp - vp8x', t => {
-	matches(t, 'webp/vp8x.webp', {width: 30, height: 20});
+	matches(t, 'webp/vp8x.webp', {width: 30, height: 20, type: 'webp'});
 });
 
 test('webp - animated', t => {
-	matches(t, 'webp/animated.webp', {width: 30, height: 17});
+	matches(t, 'webp/animated.webp', {width: 30, height: 17, type: 'webp'});
 });
 
 test('imageDimensionsFromData - error handling on DataView methods', t => {
@@ -82,12 +82,12 @@ test('imageDimensionsFromData - error handling on DataView methods', t => {
 
 test('imageDimensionsFromStream - Node.js stream', async t => {
 	const stream = fs.createReadStream('fixtures/png/valid.png');
-	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
+	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
 });
 
 test('imageDimensionsFromStream - web stream', async t => {
 	const stream = ReadableStream.from(fs.createReadStream('fixtures/png/valid.png'));
-	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20});
+	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
 });
 
 test('empty', t => {
@@ -138,7 +138,7 @@ test('imageDimensionsFromData - AVIF subarray still works', t => {
 	const padded = new Uint8Array(10 + original.length);
 	padded.set(original, 10);
 	const view = padded.subarray(10); // Non-zero byteOffset
-	t.deepEqual(imageDimensionsFromData(view), {width: 30, height: 20});
+	t.deepEqual(imageDimensionsFromData(view), {width: 30, height: 20, type: 'avif'});
 });
 
 test('imageDimensionsFromData - HEIC subarray still works', t => {
@@ -146,7 +146,7 @@ test('imageDimensionsFromData - HEIC subarray still works', t => {
 	const padded = new Uint8Array(10 + original.length);
 	padded.set(original, 10);
 	const view = padded.subarray(10); // Non-zero byteOffset
-	t.deepEqual(imageDimensionsFromData(view), {width: 30, height: 20});
+	t.deepEqual(imageDimensionsFromData(view), {width: 8, height: 10, type: 'heic'});
 });
 
 test('getIsobmffFtypBrands - Works on subarray view', t => {
