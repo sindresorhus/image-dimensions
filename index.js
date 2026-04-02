@@ -5,7 +5,7 @@ import webp from './types/webp.js';
 import avif from './types/avif.js';
 import heic from './types/heic.js';
 
-export function imageDimensionsFromData(bytes) {
+export function imageDimensionsFromData(bytes, options) {
 	// The shortest signature is 3 bytes.
 	if (bytes.length < 3) {
 		return;
@@ -19,11 +19,11 @@ export function imageDimensionsFromData(bytes) {
 		?? gif(bytes)
 		?? jpeg(bytes)
 		?? webp(bytes)
-		?? avif(bytes)
-		?? heic(bytes);
+		?? avif(bytes, options)
+		?? heic(bytes, options);
 }
 
-export async function imageDimensionsFromStream(stream) {
+export async function imageDimensionsFromStream(stream, options) {
 	let buffer = new Uint8Array(0);
 
 	for await (const chunk of stream) {
@@ -33,7 +33,7 @@ export async function imageDimensionsFromStream(stream) {
 		newBuffer.set(chunk, buffer.length);
 		buffer = newBuffer;
 
-		const dimensions = imageDimensionsFromData(buffer);
+		const dimensions = imageDimensionsFromData(buffer, options);
 		if (dimensions) {
 			return dimensions;
 		}

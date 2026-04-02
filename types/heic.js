@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getLargestAreaSize} from '../utilities.js';
+import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getIsobmffOrientedSizeFromMeta, getLargestAreaSize} from '../utilities.js';
 
 // HEIC/HEIF format specification: ISO/IEC 23008-12
 
@@ -25,7 +25,7 @@ const isHeic = bytes => {
 	return brands.some(brand => heifBrands.has(brand));
 };
 
-export default function heic(bytes) {
+export default function heic(bytes, options) {
 	if (!isHeic(bytes)) {
 		return;
 	}
@@ -34,6 +34,17 @@ export default function heic(bytes) {
 
 	if (sizes.length === 0) {
 		return;
+	}
+
+	if (options?.resolveOrientation) {
+		const oriented = getIsobmffOrientedSizeFromMeta(bytes);
+
+		if (oriented) {
+			return {
+				...oriented,
+				type: 'heic',
+			};
+		}
 	}
 
 	return {

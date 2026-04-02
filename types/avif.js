@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getLargestAreaSize} from '../utilities.js';
+import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getIsobmffOrientedSizeFromMeta, getLargestAreaSize} from '../utilities.js';
 
 // Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
 
@@ -18,7 +18,7 @@ const isAvif = bytes => {
 	return brands.some(brand => avifBrands.has(brand));
 };
 
-export default function avif(bytes) {
+export default function avif(bytes, options) {
 	if (!isAvif(bytes)) {
 		return;
 	}
@@ -27,6 +27,17 @@ export default function avif(bytes) {
 
 	if (sizes.length === 0) {
 		return;
+	}
+
+	if (options?.resolveOrientation) {
+		const oriented = getIsobmffOrientedSizeFromMeta(bytes);
+
+		if (oriented) {
+			return {
+				...oriented,
+				type: 'avif',
+			};
+		}
 	}
 
 	return {

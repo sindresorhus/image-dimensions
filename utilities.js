@@ -194,3 +194,304 @@ export function getLargestAreaSize(sizes) {
 
 	return maxSize;
 }
+
+function findTopLevelMetaBox(data) {
+	let offset = 0;
+
+	while (offset < data.length) {
+		const box = unboxIsobmffBox(data, offset);
+
+		if (!box) {
+			break;
+		}
+
+		if (box.type === 'meta') {
+			return box.data;
+		}
+
+		offset = box.tail;
+	}
+}
+
+function parsePitmItemId(pitmData) {
+	if (pitmData.length < 6) {
+		return;
+	}
+
+	const dataView = new DataView(pitmData.buffer, pitmData.byteOffset, pitmData.byteLength);
+	return getUint16(dataView, 4);
+}
+
+/*
+Parse `irot` (ImageRotation) payload: counter-clockwise 90-degree steps 0..3.
+
+Some writers use a FullBox (4-byte version/flags + angle byte). Others use a 9-byte
+box total (8-byte header + single angle byte), per common HEIC encoders.
+*/
+export function parseIsobmffIrotAngle(irotData) {
+	if (irotData.length === 0) {
+		return 0;
+	}
+
+	if (irotData.length >= 5) {
+		return irotData[4] % 4;
+	}
+
+	return irotData[0] % 4;
+}
+
+/*
+Parse `ipco` into an ordered list of property boxes (type + full-box payload after size+type).
+*/
+function parseIpcoPropertyList(ipcoData) {
+	const properties = [];
+	let offset = 0;
+
+	while (offset < ipcoData.length) {
+		const box = unboxIsobmffBox(ipcoData, offset);
+
+		if (!box) {
+			break;
+		}
+
+		properties.push({
+			type: box.type,
+			data: box.data,
+		});
+		offset = box.tail;
+	}
+
+	return properties;
+}
+
+function parseIpmaEntries(ipmaData) {
+	if (ipmaData.length < 8) {
+		return;
+	}
+
+	const version = ipmaData[0];
+	const flags = (ipmaData[1] * 65_536) + (ipmaData[2] * 256) + ipmaData[3];
+	const dataView = new DataView(ipmaData.buffer, ipmaData.byteOffset, ipmaData.byteLength);
+	let offset = 4;
+	const entryCount = getUint32(dataView, offset);
+
+	if (entryCount === undefined) {
+		return;
+	}
+
+	offset += 4;
+	const use32BitItemId = version === 1 && (flags % 2) === 1;
+	const use15BitPropertyIndex = version === 1 && (Math.floor(flags / 2) % 2) === 1;
+	const entries = [];
+
+	for (let i = 0; i < entryCount; i++) {
+		let itemId;
+
+		if (use32BitItemId) {
+			itemId = getUint32(dataView, offset);
+			offset += 4;
+		} else {
+			itemId = getUint16(dataView, offset);
+			offset += 2;
+		}
+
+		if (itemId === undefined || offset >= ipmaData.length) {
+			return;
+		}
+
+		const associationCount = ipmaData[offset];
+		offset += 1;
+		const associations = [];
+
+		for (let j = 0; j < associationCount; j++) {
+			if (use15BitPropertyIndex) {
+				const word = getUint16(dataView, offset);
+
+				if (word === undefined) {
+					return;
+				}
+
+				offset += 2;
+				associations.push({
+					essential: word >= 32_768,
+					propertyIndex: word % 32_768,
+				});
+			} else {
+				const b = ipmaData[offset];
+				offset += 1;
+
+				if (b === undefined) {
+					return;
+				}
+
+				associations.push({
+					essential: b >= 128,
+					propertyIndex: b % 128,
+				});
+			}
+		}
+
+		entries.push({
+			itemId,
+			associations,
+		});
+	}
+
+	return entries;
+}
+
+function readIspeDimensions(ispeData) {
+	const dataView = new DataView(ispeData.buffer, ispeData.byteOffset, ispeData.byteLength);
+	const width = getUint32(dataView, 4);
+	const height = getUint32(dataView, 8);
+
+	if (width === undefined || height === undefined) {
+		return;
+	}
+
+	return {
+		width,
+		height,
+	};
+}
+
+function resolvePrimaryItemAssociations(entries, pitmItemId) {
+	if (entries.length === 0) {
+		return;
+	}
+
+	if (pitmItemId !== undefined) {
+		const match = entries.find(entry => entry.itemId === pitmItemId);
+
+		if (match) {
+			return match;
+		}
+	}
+
+	return entries[0];
+}
+
+function dimensionsFromPrimaryItemProperties(properties, associations) {
+	let width;
+	let height;
+	let irot = 0;
+
+	for (const {propertyIndex} of associations) {
+		if (propertyIndex === 0) {
+			continue;
+		}
+
+		const prop = properties[propertyIndex - 1];
+
+		if (!prop) {
+			continue;
+		}
+
+		if (prop.type === 'ispe') {
+			const dims = readIspeDimensions(prop.data);
+
+			if (dims) {
+				({
+					width,
+					height,
+				} = dims);
+			}
+		} else if (prop.type === 'irot') {
+			irot = parseIsobmffIrotAngle(prop.data);
+		}
+	}
+
+	if (width === undefined || height === undefined) {
+		return;
+	}
+
+	if ((irot % 2) === 1) {
+		return {
+			width: height,
+			height: width,
+		};
+	}
+
+	return {
+		width,
+		height,
+	};
+}
+
+function parseIprpForOrientedSize(iprpData, pitmItemId) {
+	let properties = [];
+	let ipmaEntries;
+
+	let offset = 0;
+
+	while (offset < iprpData.length) {
+		const box = unboxIsobmffBox(iprpData, offset);
+
+		if (!box) {
+			break;
+		}
+
+		if (box.type === 'ipco') {
+			properties = parseIpcoPropertyList(box.data);
+		} else if (box.type === 'ipma') {
+			ipmaEntries = parseIpmaEntries(box.data);
+		}
+
+		offset = box.tail;
+	}
+
+	if (!ipmaEntries || properties.length === 0) {
+		return;
+	}
+
+	const primaryEntry = resolvePrimaryItemAssociations(ipmaEntries, pitmItemId);
+
+	if (!primaryEntry) {
+		return;
+	}
+
+	return dimensionsFromPrimaryItemProperties(properties, primaryEntry.associations);
+}
+
+function parseMetaForOrientedSize(metaData) {
+	let pitmItemId;
+	let iprpData;
+	let offset = 4;
+
+	while (offset < metaData.length) {
+		const box = unboxIsobmffBox(metaData, offset);
+
+		if (!box) {
+			break;
+		}
+
+		if (box.type === 'pitm') {
+			pitmItemId = parsePitmItemId(box.data);
+		} else if (box.type === 'iprp') {
+			iprpData = box.data;
+		}
+
+		offset = box.tail;
+	}
+
+	if (!iprpData) {
+		return;
+	}
+
+	return parseIprpForOrientedSize(iprpData, pitmItemId);
+}
+
+/*
+Resolve display-oriented width/height for the primary HEIF/AVIF item using `pitm`, `ipma`, `ipco` (`ispe` + `irot`).
+
+Returns `undefined` if orientation metadata cannot be resolved (caller should fall back to largest `ispe`).
+*/
+export function getIsobmffOrientedSizeFromMeta(data) {
+	const metaPayload = findTopLevelMetaBox(data);
+
+	if (!metaPayload) {
+		return;
+	}
+
+	return parseMetaForOrientedSize(metaPayload);
+}

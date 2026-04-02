@@ -40,7 +40,11 @@ console.log(await imageDimensionsFromStream(body));
 
 `ImageType` is exported and can be one of: `'png'`, `'jpeg'`, `'gif'`, `'webp'`, `'avif'`, or `'heic'`.
 
-### `imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<{width: number; height: number; type: ImageType} | undefined>`
+`ImageDimensionsOptions` is exported with an optional field:
+
+- `resolveOrientation` (boolean, default `false`) — For HEIF/HEIC and AVIF only, use the primary item’s `ispe` and `irot` metadata (`pitm` / `ipma`) so width and height match the oriented display (90° and 270° rotation swap dimensions). If that metadata cannot be read, the result falls back to the largest `ispe` in the file. JPEG, PNG, GIF, and WebP are unchanged (JPEG EXIF orientation is not read).
+
+### `imageDimensionsFromStream(stream: ReadableStream<Uint8Array>, options?: ImageDimensionsOptions): Promise<{width: number; height: number; type: ImageType} | undefined>`
 
 Get the dimensions of an image by reading the least amount of data.
 
@@ -48,7 +52,7 @@ Prefer this method.
 
 Returns the image dimensions and type, or `undefined` if the image format is not supported or the image data is invalid.
 
-Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
+By default returns raw pixel dimensions from the bitstream. Pass `{resolveOrientation: true}` for HEIF/HEIC and AVIF to apply `irot`.
 
 ```js
 // Node.js example
@@ -61,7 +65,7 @@ console.log(await imageDimensionsFromStream(stream));
 //=> {width: 1920, height: 1080, type: 'png'}
 ```
 
-### `imageDimensionsFromData(data: Uint8Array): {width: number; height: number; type: ImageType} | undefined`
+### `imageDimensionsFromData(data: Uint8Array, options?: ImageDimensionsOptions): {width: number; height: number; type: ImageType} | undefined`
 
 Get the dimensions of an image from data.
 
@@ -69,7 +73,7 @@ This method can be useful if you already have the image loaded in memory.
 
 Returns the image dimensions and type, or `undefined` if the image format is not supported or the image data is invalid.
 
-Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is not applied.
+By default returns raw pixel dimensions from the bitstream. Pass `{resolveOrientation: true}` for HEIF/HEIC and AVIF to apply `irot`.
 
 ```js
 import {imageDimensionsFromData} from 'image-dimensions';
@@ -101,7 +105,7 @@ npx image-dimensions unicorn.png
 **Advantages of `image-size`**
 
 - Supports more image formats
-- Supports getting JPEG image orientation
+- Supports getting JPEG EXIF orientation (this package can apply HEIF/AVIF `irot` when `resolveOrientation` is set; JPEG EXIF is not implemented)
 
 ## Related
 
