@@ -26,7 +26,18 @@ export function imageDimensionsFromData(bytes) {
 export async function imageDimensionsFromStream(stream) {
 	let buffer = new Uint8Array(0);
 
-	for await (const chunk of stream) {
+	// Check if stream supports async iteration (not supported in Safari)
+	// https://caniuse.com/wf-async-iterable-streams
+	const asyncIterator = stream[Symbol.asyncIterator]?.() ?? stream[Symbol.iterator]?.();
+
+	if (!asyncIterator) {
+		throw new TypeError('Expected an async or sync iterable stream');
+	}
+
+	// Use async iteration if available, otherwise fall back to sync iteration
+	const iteratorMethod = asyncIterator[Symbol.asyncIterator] ? 'async' : 'sync';
+
+	for await (const chunk of (iteratorMethod === 'async' ? stream : [stream])) {
 		// Merge chunks
 		const newBuffer = new Uint8Array(buffer.length + chunk.length);
 		newBuffer.set(buffer);
@@ -39,3 +50,4 @@ export async function imageDimensionsFromStream(stream) {
 		}
 	}
 }
+
