@@ -23,10 +23,39 @@ export function imageDimensionsFromData(bytes) {
 		?? heic(bytes);
 }
 
+/**
+ * Web streams are not async iterable in Safari (iOS, Desktop) as of 2026-05-10
+ *
+ * @see {@link https://caniuse.com/wf-async-iterable-streams}
+ */
+async function * asyncIterableFromStream(stream) {
+	const reader = stream.getReader();
+
+	try {
+		let running = true;
+		while (running) {
+			// eslint-disable-next-line no-await-in-loop -- Chunks must be read in order to know `done`
+			const {done, value} = await reader.read();
+
+			if (done) {
+				running = false;
+				break;
+			}
+
+			yield value;
+		}
+	} finally {
+		reader.releaseLock();
+	}
+}
+
 export async function imageDimensionsFromStream(stream) {
 	let buffer = new Uint8Array(0);
 
-	for await (const chunk of stream) {
+	const asyncIterableStream
+		= Symbol.asyncIterator in stream ? stream : asyncIterableFromStream(stream);
+
+	for await (const chunk of asyncIterableStream) {
 		// Merge chunks
 		const newBuffer = new Uint8Array(buffer.length + chunk.length);
 		newBuffer.set(buffer);

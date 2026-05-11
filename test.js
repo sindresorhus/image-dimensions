@@ -90,6 +90,12 @@ test('imageDimensionsFromStream - web stream', async t => {
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
 });
 
+test('imageDimensionsFromStream - web stream non-async iterable', async t => {
+	const stream = ReadableStream.from(fs.createReadStream('fixtures/png/valid.png'));
+	delete stream[Symbol.asyncIterator];
+	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
+});
+
 test('empty', t => {
 	t.notThrows(() => {
 		imageDimensionsFromData(new Uint8Array());
