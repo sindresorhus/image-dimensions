@@ -1,6 +1,6 @@
 {
 	"name": "image-dimensions",
-	"version": "2.5.0",
+	"version": "2.5.1",
 	"description": "Get the dimensions of an image",
 	"license": "MIT",
 	"repository": "sindresorhus/image-dimensions",
