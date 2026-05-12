@@ -30,21 +30,26 @@ export function imageDimensionsFromData(bytes) {
  */
 async function * asyncIterableFromStream(stream) {
 	const reader = stream.getReader();
+	let finished = false;
 
 	try {
-		let running = true;
-		while (running) {
+		while (!finished) {
 			// eslint-disable-next-line no-await-in-loop -- Chunks must be read in order to know `done`
 			const {done, value} = await reader.read();
 
 			if (done) {
-				running = false;
+				finished = true;
 				break;
 			}
 
 			yield value;
 		}
 	} finally {
+		// Cancel stream if consumer exited early
+		if (!finished) {
+			await reader.cancel();
+		}
+
 		reader.releaseLock();
 	}
 }

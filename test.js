@@ -96,6 +96,25 @@ test('imageDimensionsFromStream - web stream non-async iterable', async t => {
 	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
 });
 
+test('imageDimensionsFromStream - web stream non-async iterable cancels early', async t => {
+	let canceled = false;
+	const data = await fs.promises.readFile('fixtures/png/valid.png');
+	const stream = new ReadableStream({
+		start(controller) {
+			controller.enqueue(data);
+			// Never closes
+		},
+		cancel() {
+			canceled = true;
+		},
+	});
+
+	delete ReadableStream.prototype[Symbol.asyncIterator];
+
+	t.deepEqual(await imageDimensionsFromStream(stream), {width: 30, height: 20, type: 'png'});
+	t.true(canceled);
+});
+
 test('empty', t => {
 	t.notThrows(() => {
 		imageDimensionsFromData(new Uint8Array());
