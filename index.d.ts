@@ -3,6 +3,15 @@ Supported image format types.
 */
 export type ImageType = 'png' | 'jpeg' | 'gif' | 'webp' | 'avif' | 'heic';
 
+export type ImageDimensions = {
+	width: number;
+	height: number;
+	/**
+	MIME type of the image.
+	*/
+	type: ImageType;
+};
+
 /**
 Get the dimensions of an image by reading the least amount of data.
 
@@ -39,7 +48,7 @@ console.log(await imageDimensionsFromStream(stream));
 //=> {width: 1920, height: 1080, type: 'png'}
 ```
 */
-export function imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<{width: number; height: number; type: ImageType} | undefined>;
+export function imageDimensionsFromStream(stream: ReadableStream<Uint8Array>): Promise<ImageDimensions | undefined>;
 
 /**
 Get the dimensions of an image.
@@ -61,4 +70,4 @@ console.log(imageDimensionsFromData(data));
 //=> {width: 1920, height: 1080, type: 'png'}
 ```
 */
-export function imageDimensionsFromData(data: Uint8Array): {width: number; height: number; type: ImageType} | undefined;
+export function imageDimensionsFromData(data: Uint8Array): ImageDimensions | undefined;
