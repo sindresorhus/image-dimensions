@@ -68,6 +68,11 @@ export default function webp(bytes) {
 	}
 
 	if (isVP8Lossless(bytes)) {
+		// The lossless bitstream starts with a 1-byte signature (0x2F) before the packed dimension bits.
+		if (bytes[20] !== 0x2F) {
+			return;
+		}
+
 		const bits = getUint32(dataView, 21, true);
 
 		if (bits === undefined) {
