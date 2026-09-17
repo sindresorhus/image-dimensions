@@ -1,7 +1,12 @@
 import {isValidOffsetToRead, getUint16} from '../utilities.js';
 
-const SOF0 = 0xFF_C0;
-const SOF3 = 0xFF_C3;
+// Frame header markers (SOF0-SOF15, except DHT/JPG/DAC which are not frame headers).
+const isFrameMarker = marker =>
+	marker >= 0xFF_C0
+	&& marker <= 0xFF_CF
+	&& marker !== 0xFF_C4
+	&& marker !== 0xFF_C8
+	&& marker !== 0xFF_CC;
 
 const jsJpeg = bytes =>
 	bytes[0] === 0xFF
@@ -27,7 +32,7 @@ export default function jpeg(bytes) {
 		const marker = dataView.getUint16(offset);
 		offset += 2; // Move past the marker.
 
-		if (marker >= SOF0 && marker <= SOF3) {
+		if (isFrameMarker(marker)) {
 			const height = getUint16(dataView, offset + 3, false);
 			const width = getUint16(dataView, offset + 5, false);
 

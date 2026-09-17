@@ -76,6 +76,36 @@ test('jpg - truncated fill bytes', t => {
 	}
 });
 
+for (const filename of ['arithmetic.jpg', 'arithmetic-progressive.jpg']) {
+	test(`jpg - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/jpeg/${filename}`);
+		const expected = {width: 200, height: 133, type: 'jpeg'};
+		t.deepEqual(imageDimensionsFromData(data), expected);
+		t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+	});
+}
+
+for (const marker of [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF]) {
+	test(`jpg - SOF marker ${marker.toString(16)}`, t => {
+		// One-component frame header with 513×257 dimensions.
+		const data = Uint8Array.from([0xFF, 0xD8, 0xFF, marker, 0, 11, 8, 1, 1, 2, 1, 1, 1, 0x11, 0]);
+		t.deepEqual(imageDimensionsFromData(data), {width: 513, height: 257, type: 'jpeg'});
+		for (let length = 0; length < 11; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+	});
+}
+
+for (const marker of [0xC4, 0xC8, 0xCC]) {
+	test(`jpg - non-frame marker ${marker.toString(16)}`, t => {
+		// These marker codes lie between SOF markers, but do not contain dimensions.
+		const segment = [0xFF, marker, 0, 9, 8, 0, 99, 0, 77, 0, 0];
+		const header = [0xFF, 0xC0, 0, 11, 8, 1, 1, 2, 1, 1, 1, 0x11, 0];
+		t.is(imageDimensionsFromData(Uint8Array.from([0xFF, 0xD8, ...segment])), undefined);
+		t.deepEqual(imageDimensionsFromData(Uint8Array.from([0xFF, 0xD8, ...segment, ...header])), {width: 513, height: 257, type: 'jpeg'});
+	});
+}
+
 test('gif', t => {
 	matches(t, 'gif/valid.gif', {width: 30, height: 17, type: 'gif'});
 });
