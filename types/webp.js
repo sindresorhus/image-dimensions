@@ -51,6 +51,15 @@ export default function webp(bytes) {
 	}
 
 	const dataView = new DataView(bytes.buffer);
+	const isLossless = isVP8Lossless(bytes);
+	const chunkSize = getUint32(dataView, 16, true);
+
+	// The chunk payload is at least 5 bytes for VP8L and 10 bytes for VP8 and VP8X (32-bit chunk size at offset 16).
+	// A smaller chunk means the dimension fields would come from the next chunk. VP8X allows future fields, so larger sizes are fine.
+	if (chunkSize === undefined || chunkSize < (isLossless ? 5 : 10)) {
+		return;
+	}
+
 	const maxSize = 0x3F_FF;
 
 	if (isVP8Lossy(bytes)) {
@@ -67,7 +76,7 @@ export default function webp(bytes) {
 		};
 	}
 
-	if (isVP8Lossless(bytes)) {
+	if (isLossless) {
 		// The lossless bitstream starts with a 1-byte signature (0x2F) before the packed dimension bits.
 		if (bytes[20] !== 0x2F) {
 			return;
