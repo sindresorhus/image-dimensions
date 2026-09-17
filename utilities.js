@@ -20,34 +20,21 @@ Parse the FileTypeBox (ftyp) at the start of an ISOBMFF container and return an 
 Applicable to ISOBMFF-based image formats like HEIF/HEIC and AVIF. Not applicable to PNG, JPEG, GIF, or WebP.
 */
 export function getIsobmffFtypBrands(bytes) {
-	// Minimum size: 4 (size) + 4 ('ftyp') + 4 (major_brand) + 4 (minor_version)
-	if (bytes.length < 16) {
-		return;
-	}
+	// Box size (Big-endian) at offset 0, including an optional extended size.
+	const box = unboxIsobmffBox(bytes, 0);
 
-	// Validate 'ftyp' marker at offset 4
-	const isFtyp = bytes[4] === 0x66
-		&& bytes[5] === 0x74
-		&& bytes[6] === 0x79
-		&& bytes[7] === 0x70;
-
-	if (!isFtyp) {
-		return;
-	}
-
-	// Box size (Big-endian) at offset 0
-	const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-	const size = getUint32(dataView, 0);
-	if (size === undefined || size < 16 || size > bytes.length) {
+	// Validate 'ftyp' marker at offset 4.
+	// Minimum payload size: 4 (major_brand) + 4 (minor_version).
+	if (!box || box.type !== 'ftyp' || box.data.length < 8) {
 		return;
 	}
 
 	const brands = [];
 	// Major brand
-	brands.push(String.fromCodePoint(...bytes.slice(8, 12)));
-	// Compatible brands start at offset 16
-	for (let i = 16; i + 4 <= size; i += 4) {
-		brands.push(String.fromCodePoint(...bytes.slice(i, i + 4)));
+	brands.push(String.fromCodePoint(...box.data.slice(0, 4)));
+	// Compatible brands start at payload offset 8.
+	for (let i = 8; i + 4 <= box.data.length; i += 4) {
+		brands.push(String.fromCodePoint(...box.data.slice(i, i + 4)));
 	}
 
 	return brands;
@@ -62,20 +49,37 @@ Applicable to ISOBMFF-based image formats like HEIF/HEIC and AVIF.
 */
 export function unboxIsobmffBox(data, offset) {
 	const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
-	const size = getUint32(dataView, offset);
+	let size = getUint32(dataView, offset);
+	let headerSize = 8; // 4 (size) + 4 (type)
+
+	// An extended size of 1 means the real size is a 64-bit value following the type (ISO/IEC 14496-12 §4.2.2).
+	if (size === 1) {
+		headerSize += 8;
+
+		if (!isValidOffsetToRead(dataView, offset, headerSize)) {
+			return;
+		}
+
+		const extendedSize = dataView.getBigUint64(offset + 8);
+		if (extendedSize > BigInt(data.length - offset)) {
+			return;
+		}
+
+		size = Number(extendedSize);
+	}
 
 	if (size === undefined) {
 		return;
 	}
 
-	// Size includes the first 4 bytes (length)
-	if (data.length < size + offset || size < 8) {
+	// Size includes the header
+	if (data.length < size + offset || size < headerSize) {
 		return;
 	}
 
 	return {
 		type: String.fromCodePoint(...data.slice(offset + 4, offset + 8)),
-		data: data.slice(offset + 8, offset + size),
+		data: data.slice(offset + headerSize, offset + size),
 		tail: offset + size,
 	};
 }

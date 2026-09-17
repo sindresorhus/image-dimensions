@@ -1,4 +1,5 @@
 import {Buffer} from 'node:buffer';
+import fs from 'node:fs';
 import test from 'ava';
 import {imageDimensionsFromData, imageDimensionsFromStream} from './index.js';
 
@@ -93,3 +94,29 @@ for (const brand of ['heic', 'avif']) {
 		}
 	});
 }
+
+// Each fixture uses a 64-bit size for one box; its item data offset is adjusted to preserve the original image.
+for (const filename of ['extended-ftyp.avif', 'extended-meta.avif']) {
+	test(`isobmff - extended 64-bit box size - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/avif/${filename}`);
+		const expected = {width: 30, height: 20, type: 'avif'};
+		t.deepEqual(imageDimensionsFromData(data), expected);
+		t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+		const padded = Buffer.concat([Buffer.alloc(7), data, Buffer.alloc(11)]);
+		t.deepEqual(imageDimensionsFromData(padded.subarray(7, 7 + data.length)), expected);
+
+		// Both fixtures need the complete metadata box, which ends at byte 270.
+		for (let length = 0; length < 270; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+
+		t.deepEqual(imageDimensionsFromData(data.subarray(0, 270)), expected);
+	});
+}
+
+test('isobmff - truncated 64-bit extended size returns undefined', t => {
+	const data = fs.readFileSync('fixtures/avif/extended-ftyp.avif');
+	for (let length = 8; length < 16; length++) {
+		t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+	}
+});
