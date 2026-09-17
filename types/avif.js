@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getLargestAreaSize} from '../utilities.js';
+import {getIsobmffFtypBrands, getIsobmffImageSizeFromMeta} from '../utilities.js';
 
 // Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
 
@@ -23,14 +23,14 @@ export default function avif(bytes) {
 		return;
 	}
 
-	const sizes = getIsobmffIspeSizesFromMeta(bytes);
+	const size = getIsobmffImageSizeFromMeta(bytes);
 
-	if (sizes.length === 0) {
+	if (!size) {
 		return;
 	}
 
 	return {
-		...getLargestAreaSize(sizes),
+		...size,
 		type: 'avif',
 	};
 }

@@ -86,7 +86,36 @@ Traverse ISOBMFF boxes to collect image spatial extents from `ispe` properties u
 Applicable to HEIF/HEIC and AVIF; codec-agnostic within ISOBMFF.
 */
 export function getIsobmffIspeSizesFromMeta(data) {
-	const sizes = [];
+	return getIsobmffMetaInfo(data).sizes.map(({width, height}) => ({width, height}));
+}
+
+/*
+Resolve the image dimensions of a HEIF/HEIC/AVIF file from its `meta` box.
+
+Follows the primary item (`pitm`) to its `ispe` property via the item-to-property associations (`ipma`), so thumbnails or secondary items do not leak in.
+
+Returns {width, height} or undefined when the primary item has no `ispe` property.
+*/
+export function getIsobmffImageSizeFromMeta(data) {
+	const {sizes, primaryItemId, associations} = getIsobmffMetaInfo(data);
+
+	// Property indices in `ipma` are 1-based over `ipco` children.
+	const primaryAssociations = new Set(associations
+		.filter(association => association.itemId === primaryItemId)
+		.flatMap(association => association.propertyIndices));
+	const primarySize = sizes.find(size => primaryAssociations.has(size.propertyIndex));
+
+	if (!primarySize) {
+		return;
+	}
+
+	return {
+		width: primarySize.width,
+		height: primarySize.height,
+	};
+}
+
+function getIsobmffMetaInfo(data) {
 	let offset = 0;
 
 	while (offset < data.length) {
@@ -97,17 +126,27 @@ export function getIsobmffIspeSizesFromMeta(data) {
 		}
 
 		if (box.type === 'meta') {
-			parseIsobmffMetaBox(box.data, sizes);
+			return parseIsobmffMetaBox(box.data);
 		}
 
 		offset = box.tail;
 	}
 
-	return sizes;
+	return {
+		sizes: [],
+		primaryItemId: undefined,
+		associations: [],
+	};
 }
 
 // Parses `meta` box
-function parseIsobmffMetaBox(data, sizes) {
+function parseIsobmffMetaBox(data) {
+	const info = {
+		sizes: [],
+		primaryItemId: undefined,
+		associations: [],
+	};
+
 	// Skip version (1 byte) and flags (3 bytes).
 	let offset = 4; // Version + flags
 
@@ -119,17 +158,83 @@ function parseIsobmffMetaBox(data, sizes) {
 		}
 
 		if (box.type === 'iprp') {
-			parseIsobmffIprpBox(box.data, sizes);
+			parseIsobmffIprpBox(box.data, info);
+		} else if (box.type === 'pitm') {
+			info.primaryItemId = parseIsobmffPitmBox(box.data);
 		}
 
 		offset = box.tail;
 	}
 
-	return sizes;
+	return info;
+}
+
+// Parses `meta.pitm` box (Primary Item), returns the primary item ID.
+function parseIsobmffPitmBox(data) {
+	if (data.length < 6 || data[0] > 1) {
+		return;
+	}
+
+	const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+	// Version 0 uses a 16-bit item ID, version 1 a 32-bit one.
+	return data[0] === 0 ? getUint16(dataView, 4) : getUint32(dataView, 4);
+}
+
+// Parses `meta.iprp.ipma` box (Item to Property Association), returns [{itemId, propertyIndices}].
+function parseIsobmffIpmaBox(data) {
+	if (data.length < 8 || data[0] > 1) {
+		return [];
+	}
+
+	const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
+	const version = dataView.getUint8(0);
+	const flags = dataView.getUint8(3);
+	const entryCount = getUint32(dataView, 4);
+
+	if (entryCount === undefined) {
+		return [];
+	}
+
+	const itemIdSize = version === 0 ? 2 : 4;
+	// eslint-disable-next-line no-bitwise
+	const associationSize = (flags & 1) === 0 ? 1 : 2;
+	const essentialMask = associationSize === 1 ? 0x7F : 0x7F_FF;
+
+	const associations = [];
+	let offset = 8;
+
+	for (let entry = 0; entry < entryCount && offset + itemIdSize + 1 <= data.byteLength; entry++) {
+		const itemId = itemIdSize === 2 ? getUint16(dataView, offset) : getUint32(dataView, offset);
+		offset += itemIdSize;
+		const propertyCount = dataView.getUint8(offset);
+		offset++;
+
+		if (!isValidOffsetToRead(dataView, offset, propertyCount * associationSize)) {
+			return [];
+		}
+
+		const propertyIndices = [];
+		for (let index = 0; index < propertyCount; index++) {
+			const value = associationSize === 1 ? dataView.getUint8(offset) : dataView.getUint16(offset);
+			offset += associationSize;
+
+			// The essential bit is not part of the property index. Index 0 means "no property".
+			// eslint-disable-next-line no-bitwise
+			const propertyIndex = value & essentialMask;
+			if (propertyIndex > 0) {
+				propertyIndices.push(propertyIndex);
+			}
+		}
+
+		associations.push({itemId, propertyIndices});
+	}
+
+	return associations;
 }
 
 // Parses `meta.iprp` box (Item Properties)
-function parseIsobmffIprpBox(data, sizes) {
+function parseIsobmffIprpBox(data, info) {
 	let offset = 0;
 
 	while (offset < data.length) {
@@ -140,7 +245,9 @@ function parseIsobmffIprpBox(data, sizes) {
 		}
 
 		if (box.type === 'ipco') {
-			parseIsobmffIpcoBox(box.data, sizes);
+			parseIsobmffIpcoBox(box.data, info);
+		} else if (box.type === 'ipma') {
+			info.associations.push(...parseIsobmffIpmaBox(box.data));
 		}
 
 		offset = box.tail;
@@ -148,8 +255,10 @@ function parseIsobmffIprpBox(data, sizes) {
 }
 
 // Parses `meta.iprp.ipco` box (Item Property Container)
-function parseIsobmffIpcoBox(data, sizes) {
+function parseIsobmffIpcoBox(data, info) {
 	let offset = 0;
+	// Property indices are 1-based over the `ipco` children.
+	let propertyIndex = 0;
 
 	while (offset < data.length) {
 		const box = unboxIsobmffBox(data, offset);
@@ -157,6 +266,8 @@ function parseIsobmffIpcoBox(data, sizes) {
 		if (!box) {
 			break;
 		}
+
+		propertyIndex++;
 
 		// Image Spatial Extent
 		if (box.type === 'ispe') {
@@ -168,9 +279,10 @@ function parseIsobmffIpcoBox(data, sizes) {
 				return;
 			}
 
-			sizes.push({
+			info.sizes.push({
 				width,
 				height,
+				propertyIndex,
 			});
 		}
 

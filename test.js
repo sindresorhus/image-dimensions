@@ -124,6 +124,12 @@ test('heic', t => {
 	// matches(t, 'heic/valid-metadata-rotated.heic', {width: 4032, height: 3024, type: 'heic'});
 });
 
+test('heic - secondary item larger than primary', t => {
+	// The file contains a 256×256 secondary (thumbnail-like) item and a 128×96 primary item.
+	// Dimensions must come from the primary item, not the largest item.
+	matches(t, 'heic/primary-smaller.heic', {width: 128, height: 96, type: 'heic'});
+});
+
 test('webp - vp8', t => {
 	matches(t, 'webp/vp8.webp', {width: 30, height: 20, type: 'webp'});
 });

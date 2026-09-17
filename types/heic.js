@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffIspeSizesFromMeta, getLargestAreaSize} from '../utilities.js';
+import {getIsobmffFtypBrands, getIsobmffImageSizeFromMeta} from '../utilities.js';
 
 // HEIC/HEIF format specification: ISO/IEC 23008-12
 
@@ -30,14 +30,14 @@ export default function heic(bytes) {
 		return;
 	}
 
-	const sizes = getIsobmffIspeSizesFromMeta(bytes);
+	const size = getIsobmffImageSizeFromMeta(bytes);
 
-	if (sizes.length === 0) {
+	if (!size) {
 		return;
 	}
 
 	return {
-		...getLargestAreaSize(sizes),
+		...size,
 		type: 'heic',
 	};
 }
