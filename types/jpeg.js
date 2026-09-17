@@ -18,6 +18,12 @@ export default function jpeg(bytes) {
 	let offset = 2; // Start after the SOI marker.
 
 	while (isValidOffsetToRead(dataView, offset, 2)) {
+		// Skip fill bytes (0xFF) which may precede any marker.
+		if (dataView.getUint8(offset) === 0xFF && dataView.getUint8(offset + 1) === 0xFF) {
+			offset++;
+			continue;
+		}
+
 		const marker = dataView.getUint16(offset);
 		offset += 2; // Move past the marker.
 

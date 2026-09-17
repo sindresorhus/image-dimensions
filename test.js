@@ -1,3 +1,4 @@
+import {Buffer} from 'node:buffer';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'ava';
@@ -51,6 +52,28 @@ test('jpg - no exif', t => {
 
 test('jpg - progressive', t => {
 	matches(t, 'jpeg/progressive.jpg', {width: 40, height: 27, type: 'jpeg'});
+});
+
+for (const fillCount of [1, 2, 8]) {
+	for (const location of ['first segment', 'frame header']) {
+		test(`jpg - ${fillCount} fill bytes before ${location}`, async t => {
+			const original = fs.readFileSync('fixtures/jpeg/no-exif.jpg');
+			const offset = location === 'first segment' ? 2 : original.indexOf(Buffer.from([0xFF, 0xC2]));
+			t.true(offset >= 2);
+			// Fill bytes are permitted before any marker, including the first segment.
+			const data = Buffer.concat([original.subarray(0, offset), Buffer.alloc(fillCount, 0xFF), original.subarray(offset)]);
+			const expected = {width: 200, height: 133, type: 'jpeg'};
+			t.deepEqual(imageDimensionsFromData(data), expected);
+			t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+		});
+	}
+}
+
+test('jpg - truncated fill bytes', t => {
+	for (const fillCount of [1, 2, 8]) {
+		const data = Uint8Array.from([0xFF, 0xD8, ...new Uint8Array(fillCount).fill(0xFF)]);
+		t.is(imageDimensionsFromData(data), undefined);
+	}
 });
 
 test('gif', t => {
