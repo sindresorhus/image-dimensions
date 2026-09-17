@@ -69,6 +69,20 @@ for (const fillCount of [1, 2, 8]) {
 	}
 }
 
+for (const filename of ['no-exif.jpg', 'arithmetic.jpg']) {
+	for (const markerCount of [1, 3]) {
+		test(`jpg - ${filename} with ${markerCount} TEM markers`, async t => {
+			const original = fs.readFileSync(`fixtures/jpeg/${filename}`);
+			// TEM is a standalone marker and has no segment length.
+			const markers = Buffer.from(Array.from({length: markerCount}, () => [0xFF, 0x01]).flat());
+			const data = Buffer.concat([original.subarray(0, 2), markers, original.subarray(2)]);
+			const expected = {width: 200, height: 133, type: 'jpeg'};
+			t.deepEqual(imageDimensionsFromData(data), expected);
+			t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+		});
+	}
+}
+
 test('jpg - truncated fill bytes', t => {
 	for (const fillCount of [1, 2, 8]) {
 		const data = Uint8Array.from([0xFF, 0xD8, ...new Uint8Array(fillCount).fill(0xFF)]);

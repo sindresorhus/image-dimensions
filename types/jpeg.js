@@ -32,6 +32,11 @@ export default function jpeg(bytes) {
 		const marker = dataView.getUint16(offset);
 		offset += 2; // Move past the marker.
 
+		// TEM is a standalone marker with no segment length.
+		if (marker === 0xFF_01) {
+			continue;
+		}
+
 		if (isFrameMarker(marker)) {
 			const height = getUint16(dataView, offset + 3, false);
 			const width = getUint16(dataView, offset + 5, false);
