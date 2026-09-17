@@ -45,12 +45,14 @@ async function * asyncIterableFromStream(stream) {
 			yield value;
 		}
 	} finally {
-		// Cancel stream if consumer exited early
-		if (!finished) {
-			await reader.cancel();
+		try {
+			// Cancel stream if consumer exited early
+			if (!finished) {
+				await reader.cancel();
+			}
+		} finally {
+			reader.releaseLock();
 		}
-
-		reader.releaseLock();
 	}
 }
 
