@@ -17,6 +17,12 @@ const isAppleMinifiedPng = bytes =>
 	&& bytes[14] === 0x42
 	&& bytes[15] === 0x49;
 
+const isImageHeaderChunk = (bytes, offset) =>
+	bytes[offset] === 0x49 // I
+	&& bytes[offset + 1] === 0x48 // H
+	&& bytes[offset + 2] === 0x44 // D
+	&& bytes[offset + 3] === 0x52; // R
+
 export default function png(bytes) {
 	if (!isPng(bytes)) {
 		return;
@@ -24,9 +30,14 @@ export default function png(bytes) {
 
 	const dataView = new DataView(bytes.buffer);
 	const isAppleMinified = isAppleMinifiedPng(bytes);
+	const chunkTypeOffset = isAppleMinified ? 28 : 12;
 
-	const width = getUint32(dataView, isAppleMinified ? 32 : 16, false);
-	const height = getUint32(dataView, isAppleMinified ? 36 : 20, false);
+	if (!isImageHeaderChunk(bytes, chunkTypeOffset)) {
+		return;
+	}
+
+	const width = getUint32(dataView, chunkTypeOffset + 4, false);
+	const height = getUint32(dataView, chunkTypeOffset + 8, false);
 
 	if (width === undefined || height === undefined) {
 		return;

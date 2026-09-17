@@ -29,6 +29,18 @@ test('png - animated', t => {
 	matches(t, 'png/animated.png', {width: 30, height: 17, type: 'png'});
 });
 
+test('png - missing IHDR chunk', t => {
+	const data = fs.readFileSync('fixtures/png/valid.png');
+	data.set(new TextEncoder().encode('IDAT'), 12);
+	t.is(imageDimensionsFromData(data), undefined);
+});
+
+test('png - apple minified missing IHDR chunk', t => {
+	const data = fs.readFileSync('fixtures/png/apple-minified.png');
+	data.set(new TextEncoder().encode('IDAT'), 28);
+	t.is(imageDimensionsFromData(data), undefined);
+});
+
 test('jpg', t => {
 	matches(t, 'jpeg/valid.jpg', {width: 200, height: 133, type: 'jpeg'});
 });
