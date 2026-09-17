@@ -1,6 +1,9 @@
 import {Buffer} from 'node:buffer';
 import fs from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
+import {spawnSync} from 'node:child_process';
+import {devNull} from 'node:os';
 import test from 'ava';
 import {getIsobmffFtypBrands, unboxIsobmffBox, getIsobmffIspeSizesFromMeta, getLargestAreaSize} from './utilities.js';
 import {imageDimensionsFromStream, imageDimensionsFromData} from './index.js';
@@ -356,4 +359,432 @@ test('getIsobmffFtypBrands - Truncated size returns undefined', t => {
 	const view = new DataView(buf.buffer);
 	view.setUint32(0, larger, false);
 	t.is(getIsobmffFtypBrands(buf), undefined);
+});
+
+for (const filename of ['package.json', devNull]) {
+	test(`cli - unsupported or empty input - ${filename}`, t => {
+		const result = spawnSync(process.execPath, ['cli.js', filename], {encoding: 'utf8'});
+		t.is(result.status, 1);
+		t.is(result.stdout, '');
+		t.is(result.stderr, 'Unsupported image format or invalid image data.\n');
+	});
+}
+
+test('cli - valid image', t => {
+	const result = spawnSync(process.execPath, ['cli.js', 'fixtures/png/valid.png'], {encoding: 'utf8'});
+	t.is(result.status, 0);
+	t.is(result.stdout, '30x20\n');
+	t.is(result.stderr, '');
+});
+
+test('cli - no argument', t => {
+	const result = spawnSync(process.execPath, ['cli.js'], {encoding: 'utf8'});
+	t.is(result.status, 1);
+	t.is(result.stdout, '');
+	t.is(result.stderr, 'Usage: image-dimensions <image>\n');
+});
+
+test('cli - missing file', t => {
+	const result = spawnSync(process.execPath, ['cli.js', 'nonexistent-file.png'], {encoding: 'utf8'});
+	t.is(result.status, 1);
+	t.is(result.stdout, '');
+	t.regex(result.stderr, /^ENOENT:.*nonexistent-file\.png.*\n$/);
+});
+
+test('cli - directory', t => {
+	const result = spawnSync(process.execPath, ['cli.js', 'fixtures'], {encoding: 'utf8'});
+	t.is(result.status, 1);
+	t.is(result.stdout, '');
+	t.regex(result.stderr, /^EISDIR:.*\n$/);
+});
+
+for (const filename of ['readme.md', 'index.d.ts']) {
+	test(`Node.js example works without ReadableStream.from - ${filename}`, t => {
+		const documentation = fs.readFileSync(filename, 'utf8');
+		const example = documentation.match(/\/\/ Node\.js example\n([\s\S]*?)```/)[1]
+			.replaceAll('\'image-dimensions\'', '\'./index.js\'')
+			.replaceAll('\'unicorn.png\'', '\'fixtures/png/valid.png\'');
+		// Node 18 supports web streams, but does not provide ReadableStream.from().
+		const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `delete ReadableStream.from;\n${example}`], {encoding: 'utf8'});
+		t.is(result.status, 0);
+		t.is(result.stderr, '');
+		t.is(result.stdout, '{ width: 30, height: 20, type: \'png\' }\n');
+	});
+}
+
+const box = (type, payload) => {
+	const header = Buffer.alloc(8);
+	header.writeUInt32BE(8 + payload.length);
+	header.write(type, 4);
+	return Buffer.concat([header, payload]);
+};
+
+const spatialExtents = (width, height) => {
+	const payload = Buffer.alloc(12);
+	payload.writeUInt32BE(width, 4);
+	payload.writeUInt32BE(height, 8);
+	return box('ispe', payload);
+};
+
+function image({brand = 'heic', version = 0, wideIndices = false, essential = false, primaryId = 7, propertyIndex = 3, reverseOrder = false, truncateAssociation = false, truncatePrimary = false} = {}) {
+	const itemIdSize = version === 0 ? 2 : 4;
+	const writeItemId = (data, value, offset) => {
+		if (version === 0) {
+			data.writeUInt16BE(value, offset);
+		} else {
+			data.writeUInt32BE(value, offset);
+		}
+	};
+
+	const primary = Buffer.alloc(4 + itemIdSize);
+	primary[0] = version;
+	writeItemId(primary, primaryId, 4);
+
+	const associationHeader = Buffer.alloc(8);
+	associationHeader[0] = version;
+	associationHeader[3] = Number(wideIndices);
+	associationHeader.writeUInt32BE(2, 4);
+	const entries = [];
+	for (const [itemId, index] of [[1, 1], [7, propertyIndex]]) {
+		const entry = Buffer.alloc(itemIdSize + 1 + (wideIndices ? 2 : 1));
+		writeItemId(entry, itemId, 0);
+		entry[itemIdSize] = 1;
+		const value = index + (essential ? (wideIndices ? 0x80_00 : 0x80) : 0);
+		if (wideIndices) {
+			entry.writeUInt16BE(value, itemIdSize + 1);
+		} else {
+			entry[itemIdSize + 1] = value;
+		}
+
+		entries.push(entry);
+	}
+
+	const associations = Buffer.concat([associationHeader, ...entries]);
+	const properties = box('ipco', Buffer.concat([
+		spatialExtents(1024, 768),
+		box('colr', Buffer.from('nclx')),
+		spatialExtents(128, 96),
+	]));
+	const associationBox = box('ipma', truncateAssociation ? associations.subarray(0, -1) : associations);
+	const itemProperties = box('iprp', Buffer.concat(reverseOrder ? [associationBox, properties] : [properties, associationBox]));
+	const primaryBox = box('pitm', truncatePrimary ? Buffer.alloc(0) : primary);
+	const meta = box('meta', Buffer.concat([Buffer.alloc(4), ...(reverseOrder ? [itemProperties, primaryBox] : [primaryBox, itemProperties])]));
+	return Buffer.concat([box('ftyp', Buffer.concat([Buffer.from(brand), Buffer.alloc(4)])), meta]);
+}
+
+for (const brand of ['heic', 'avif']) {
+	for (const version of [0, 1]) {
+		for (const wideIndices of [false, true]) {
+			for (const essential of [false, true]) {
+				test(`${brand} primary association: version ${version}, wide ${wideIndices}, essential ${essential}`, async t => {
+					const data = image({brand, version, wideIndices, essential});
+					const expected = {width: 128, height: 96, type: brand};
+					t.deepEqual(imageDimensionsFromData(data), expected);
+					t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+				});
+			}
+		}
+	}
+
+	test(`${brand} primary selection does not depend on box order`, t => {
+		t.deepEqual(imageDimensionsFromData(image({brand, reverseOrder: true})), {width: 128, height: 96, type: brand});
+	});
+
+	for (const options of [{primaryId: 99}, {propertyIndex: 0}, {propertyIndex: 2}, {propertyIndex: 9}, {truncateAssociation: true}, {truncatePrimary: true}]) {
+		test(`${brand} unresolved primary: ${JSON.stringify(options)}`, t => {
+			t.is(imageDimensionsFromData(image({brand, ...options})), undefined);
+		});
+	}
+
+	test(`${brand} truncated metadata never returns a secondary size`, t => {
+		const data = image({brand});
+		for (let length = 0; length < data.length; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+	});
+
+	test(`${brand} nested size-0 box is invalid`, t => {
+		// A size of 0 is only valid for the last top-level box (ISO/IEC 14496-12 §4.2.2).
+		const data = image({brand});
+		// Overwrite the size field of the `ipma` box (nested inside `meta` → `iprp`).
+		const ipmaOffset = data.indexOf(Buffer.from('ipma'));
+		data.writeUInt32BE(0, ipmaOffset - 4);
+		t.is(imageDimensionsFromData(data), undefined);
+	});
+}
+
+test('avif - size-0 metadata works with partial data and byte streams', async t => {
+	const data = fs.readFileSync('fixtures/avif/metasize0.avif');
+	const expected = {width: 33, height: 11, type: 'avif'};
+	t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+	const padded = Buffer.concat([Buffer.alloc(7), data, Buffer.alloc(11)]);
+	t.deepEqual(imageDimensionsFromData(padded.subarray(7, 7 + data.length)), expected);
+
+	// The metadata needed to resolve the primary dimensions ends at byte 426, before the image payload.
+	for (let length = 0; length < 426; length++) {
+		t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+	}
+
+	t.deepEqual(imageDimensionsFromData(data.subarray(0, 426)), expected);
+});
+
+// Each fixture uses a 64-bit size for one box; its item data offset is adjusted to preserve the original image.
+for (const filename of ['extended-ftyp.avif', 'extended-meta.avif']) {
+	test(`isobmff - extended 64-bit box size - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/avif/${filename}`);
+		const expected = {width: 30, height: 20, type: 'avif'};
+		t.deepEqual(imageDimensionsFromData(data), expected);
+		t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+		const padded = Buffer.concat([Buffer.alloc(7), data, Buffer.alloc(11)]);
+		t.deepEqual(imageDimensionsFromData(padded.subarray(7, 7 + data.length)), expected);
+
+		// Both fixtures need the complete metadata box, which ends at byte 270.
+		for (let length = 0; length < 270; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+
+		t.deepEqual(imageDimensionsFromData(data.subarray(0, 270)), expected);
+	});
+}
+
+test('isobmff - truncated 64-bit extended size returns undefined', t => {
+	const data = fs.readFileSync('fixtures/avif/extended-ftyp.avif');
+	for (let length = 8; length < 16; length++) {
+		t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+	}
+});
+
+for (const [filename, width, height, type] of [
+	['png/palette.png', 100, 60, 'png'],
+	['png/gray16.png', 1, 1, 'png'],
+	['png/tiny.png', 3, 1, 'png'],
+	['png/interlaced.png', 200, 100, 'png'],
+	['png/truecolor16-uncompressed.png', 40, 30, 'png'],
+	['gif/animated.gif', 20, 10, 'gif'],
+	['webp/opaque-lossy.webp', 40, 30, 'webp'],
+	['webp/wide-lossy.webp', 999, 257, 'webp'],
+	['webp/wide-lossless.webp', 999, 257, 'webp'],
+	['jpeg/orientation-6.jpg', 120, 90, 'jpeg'],
+	['jpeg/valid.jpg', 200, 133, 'jpeg'],
+	['webp/vp8l.webp', 30, 20, 'webp'],
+	['webp/vp8x.webp', 30, 20, 'webp'],
+]) {
+	test(`additional fixture - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/${filename}`);
+		const expected = {width, height, type};
+		t.deepEqual(imageDimensionsFromData(data), expected);
+		const padded = Buffer.concat([Buffer.alloc(7, 0xFF), data, Buffer.alloc(11, 0xFF)]);
+		t.deepEqual(imageDimensionsFromData(padded.subarray(7, 7 + data.length)), expected);
+		t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), expected);
+	});
+}
+
+for (const [filename, headerLength] of [
+	['png/valid.png', 24],
+	['png/apple-minified.png', 40],
+	['gif/valid.gif', 10],
+	['jpeg/no-exif.jpg', 163],
+	['webp/vp8.webp', 30],
+	['webp/vp8l.webp', 25],
+	['webp/vp8x.webp', 30],
+]) {
+	test(`dimension header boundary - ${filename}`, t => {
+		const data = fs.readFileSync(`fixtures/${filename}`);
+		const expected = imageDimensionsFromData(data);
+		t.truthy(expected);
+		for (let length = 0; length < headerLength; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+
+		t.deepEqual(imageDimensionsFromData(data.subarray(0, headerLength)), expected);
+	});
+}
+
+test('gif - GIF87a logical screen dimensions', t => {
+	const data = fs.readFileSync('fixtures/gif/valid.gif');
+	data.write('GIF87a');
+	t.deepEqual(imageDimensionsFromData(data), {width: 30, height: 17, type: 'gif'});
+});
+
+test('heic - returns raw dimensions without applying rotation', t => {
+	const data = fs.readFileSync('fixtures/heic/valid-metadata-rotated.heic');
+	t.deepEqual(imageDimensionsFromData(data), {width: 4032, height: 3024, type: 'heic'});
+});
+
+for (const filename of ['png/valid.png', 'jpeg/valid.jpg', 'gif/valid.gif', 'webp/vp8l.webp', 'heic/valid.heic', 'avif/valid.avif']) {
+	test(`stream - stops after dimensions are available - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/${filename}`);
+		const expected = imageDimensionsFromData(data);
+		t.truthy(expected);
+		let closed = false;
+		async function * chunks() {
+			try {
+				yield new Uint8Array();
+				yield data;
+				t.fail('The stream must not read another chunk after finding dimensions');
+			} finally {
+				closed = true;
+			}
+		}
+
+		t.deepEqual(await imageDimensionsFromStream(chunks()), expected);
+		t.true(closed);
+	});
+}
+
+test('stream - propagates source errors', async t => {
+	const error = new Error('Source failed');
+	async function * chunks() {
+		yield Uint8Array.of(0x89, 0x50);
+		throw error;
+	}
+
+	await t.throwsAsync(imageDimensionsFromStream(chunks()), {is: error});
+});
+
+test('stream - empty and unsupported data', async t => {
+	t.is(await imageDimensionsFromStream(ReadableStream.from([])), undefined);
+	t.is(await imageDimensionsFromStream(ReadableStream.from([new Uint8Array(), Uint8Array.of(1, 2, 3)])), undefined);
+});
+
+for (const [filename, width, height, type] of [
+	['png/valid.png', 30, 20, 'png'],
+	['jpeg/no-exif.jpg', 200, 133, 'jpeg'],
+	['gif/valid.gif', 30, 17, 'gif'],
+	['webp/vp8l.webp', 30, 20, 'webp'],
+	['avif/valid.avif', 30, 20, 'avif'],
+	['heic/valid.heic', 8, 10, 'heic'],
+]) {
+	test(`stream preserves chunk view boundaries - ${filename}`, async t => {
+		const data = fs.readFileSync(`fixtures/${filename}`);
+		async function * chunks() {
+			for (let offset = 0; offset < data.length; offset += 17) {
+				const chunk = data.subarray(offset, offset + 17);
+				// Bytes outside each view must not enter the accumulated image data.
+				const padded = Buffer.concat([Buffer.alloc(7, 0xFF), chunk, Buffer.alloc(11, 0xFF)]);
+				yield padded.subarray(7, 7 + chunk.length);
+				yield new Uint8Array();
+			}
+		}
+
+		t.deepEqual(await imageDimensionsFromStream(chunks()), {width, height, type});
+	});
+}
+
+for (const outcome of ['dimensions', 'unsupported', 'empty']) {
+	test(`non-iterable web stream releases its lock after ${outcome}`, async t => {
+		let canceled = false;
+		const readableStream = new ReadableStream({
+			start(controller) {
+				if (outcome === 'dimensions') {
+					controller.enqueue(fs.readFileSync('fixtures/png/valid.png'));
+				} else {
+					if (outcome === 'unsupported') {
+						controller.enqueue(Uint8Array.of(1, 2, 3));
+					}
+
+					controller.close();
+				}
+			},
+			cancel() {
+				canceled = true;
+			},
+		});
+		const stream = {getReader: readableStream.getReader.bind(readableStream)};
+		const expected = outcome === 'dimensions' ? {width: 30, height: 20, type: 'png'} : undefined;
+		t.deepEqual(await imageDimensionsFromStream(stream), expected);
+		t.false(readableStream.locked);
+		t.is(canceled, outcome === 'dimensions');
+	});
+}
+
+for (const failure of ['read', 'cancel']) {
+	test(`non-iterable web stream releases its lock after ${failure} fails`, async t => {
+		const error = new Error(`${failure} failed`);
+		const readableStream = new ReadableStream({
+			start(controller) {
+				if (failure === 'read') {
+					controller.error(error);
+				} else {
+					controller.enqueue(fs.readFileSync('fixtures/png/valid.png'));
+				}
+			},
+			cancel() {
+				throw error;
+			},
+		});
+		const stream = {getReader: readableStream.getReader.bind(readableStream)};
+
+		// Preserve the source error, including errors from cancellation.
+		await t.throwsAsync(imageDimensionsFromStream(stream), {is: error});
+		t.false(readableStream.locked);
+	});
+}
+
+for (const signature of [0, 0x2E, 0x30, 0xFF]) {
+	test(`webp - rejects lossless signature ${signature}`, async t => {
+		const data = fs.readFileSync('fixtures/webp/vp8l.webp');
+		data[20] = signature;
+		t.is(imageDimensionsFromData(data), undefined);
+		t.is(await imageDimensionsFromStream(ReadableStream.from([data])), undefined);
+		t.is(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), undefined);
+	});
+}
+
+for (const [filename, minimumSize] of [['vp8.webp', 10], ['vp8l.webp', 5], ['vp8x.webp', 10]]) {
+	test(`webp - ${filename} reads dimensions at the header boundary`, async t => {
+		const data = fs.readFileSync(`fixtures/webp/${filename}`);
+		const expected = {width: 30, height: 20, type: 'webp'};
+		const headerLength = 20 + minimumSize;
+		for (let length = 0; length < headerLength; length++) {
+			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
+		}
+
+		// A complete compressed payload is not needed to read the dimension header.
+		const header = data.subarray(0, headerLength);
+		t.deepEqual(imageDimensionsFromData(header), expected);
+		t.deepEqual(await imageDimensionsFromStream(ReadableStream.from(Array.from(header, byte => Uint8Array.of(byte)))), expected);
+		const padded = Buffer.concat([Buffer.alloc(7), header, Buffer.alloc(11)]);
+		t.deepEqual(imageDimensionsFromData(padded.subarray(7, 7 + header.length)), expected);
+
+		header.writeUInt32LE(minimumSize, 16);
+		t.deepEqual(imageDimensionsFromData(header), expected);
+	});
+
+	for (let size = 0; size < minimumSize; size++) {
+		test(`webp - ${filename} rejects declared payload size ${size}`, async t => {
+			const data = fs.readFileSync(`fixtures/webp/${filename}`);
+			// Keep the dimension bytes present to verify that reads respect the declared chunk boundary.
+			data.writeUInt32LE(size, 16);
+			t.is(imageDimensionsFromData(data), undefined);
+			t.is(await imageDimensionsFromStream(ReadableStream.from(Array.from(data, byte => Uint8Array.of(byte)))), undefined);
+		});
+	}
+}
+
+test('webp - rejects undersized VP8X chunk', async t => {
+	// RIFF/WEBP with a VP8X chunk declared smaller than the required 10 bytes.
+	// The canvas fields then come from the following chunk, so the file is invalid.
+	const bytes = new Uint8Array(40);
+	const view = new DataView(bytes.buffer);
+	bytes.set(Buffer.from('RIFF'), 0);
+	view.setUint32(4, 32, true);
+	bytes.set(Buffer.from('WEBP'), 8);
+	bytes.set(Buffer.from('VP8X'), 12);
+	view.setUint32(16, 4, true); // VP8X chunks need at least 10 payload bytes.
+	// Canvas width/height would be read from the next chunk's header bytes.
+	bytes.set(Buffer.from('ABCD'), 20);
+	bytes.set([0x10, 0x22, 0x33], 24);
+	bytes.set([0x44, 0x55, 0x66], 27);
+	t.is(imageDimensionsFromData(bytes), undefined);
+	t.is(await imageDimensionsFromStream(ReadableStream.from([bytes])), undefined);
+});
+
+test('webp - accepts oversized VP8X chunk with future fields', t => {
+	// The extended format allows future fields after the 10 known payload bytes (“Unknown fields MUST be ignored”), so a larger VP8X chunk stays valid.
+	const data = fs.readFileSync('fixtures/webp/vp8x.webp');
+	const extended = Buffer.concat([data.subarray(0, 30), Buffer.alloc(2), data.subarray(30)]);
+	extended.writeUInt32LE(12, 16); // Chunk payload is now 12 bytes.
+	extended.writeUInt32LE(extended.length - 8, 4); // RIFF size excludes its first 8 bytes.
+	t.deepEqual(imageDimensionsFromData(extended), {width: 30, height: 20, type: 'webp'});
 });

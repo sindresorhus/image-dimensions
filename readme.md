@@ -53,9 +53,10 @@ Note: Returns raw pixel dimensions; orientation (EXIF or HEIF/AVIF `irot`) is no
 ```js
 // Node.js example
 import {createReadStream} from 'node:fs';
+import {Readable} from 'node:stream';
 import {imageDimensionsFromStream} from 'image-dimensions';
 
-const stream = ReadableStream.from(createReadStream('unicorn.png'));
+const stream = Readable.toWeb(createReadStream('unicorn.png'));
 
 console.log(await imageDimensionsFromStream(stream));
 //=> {width: 1920, height: 1080, type: 'png'}
