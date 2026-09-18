@@ -1,39 +1,8 @@
-import {isValidOffsetToRead, getUint32} from '../utilities.js';
+import {isValidOffsetToRead, getUint32, getFourCC} from '../utilities.js';
 
 // Specification: https://developers.google.com/speed/webp/docs/riff_container
 
-const isWebp = bytes =>
-	// RIFF
-	bytes[0] === 0x52
-	&& bytes[1] === 0x49
-	&& bytes[2] === 0x46
-	&& bytes[3] === 0x46
-	// WEBP
-	&& bytes[8] === 0x57
-	&& bytes[9] === 0x45
-	&& bytes[10] === 0x42
-	&& bytes[11] === 0x50;
-
-const isVP8Lossy = bytes =>
-	// `VP8 ` (note the space)
-	bytes[12] === 0x56
-	&& bytes[13] === 0x50
-	&& bytes[14] === 0x38
-	&& bytes[15] === 0x20;
-
-const isVP8Lossless = bytes =>
-	// `VP8L`
-	bytes[12] === 0x56
-	&& bytes[13] === 0x50
-	&& bytes[14] === 0x38
-	&& bytes[15] === 0x4C;
-
-const isVP8Extended = bytes =>
-	// `VP8X`
-	bytes[12] === 0x56
-	&& bytes[13] === 0x50
-	&& bytes[14] === 0x38
-	&& bytes[15] === 0x58;
+const isWebp = bytes => getFourCC(bytes, 0) === 'RIFF' && getFourCC(bytes, 8) === 'WEBP';
 
 function readUInt24LE(dataView, offset) {
 	const byte1 = dataView.getUint8(offset);
@@ -51,18 +20,19 @@ export default function webp(bytes) {
 	}
 
 	const dataView = new DataView(bytes.buffer);
-	const isLossless = isVP8Lossless(bytes);
+	// The first chunk is `VP8 ` (lossy, note the space), `VP8L` (lossless), or `VP8X` (extended).
+	const chunkType = getFourCC(bytes, 12);
 	const chunkSize = getUint32(dataView, 16, true);
 
 	// The chunk payload is at least 5 bytes for VP8L and 10 bytes for VP8 and VP8X (32-bit chunk size at offset 16).
 	// A smaller chunk means the dimension fields would come from the next chunk. VP8X allows future fields, so larger sizes are fine.
-	if (chunkSize === undefined || chunkSize < (isLossless ? 5 : 10)) {
+	if (chunkSize === undefined || chunkSize < (chunkType === 'VP8L' ? 5 : 10)) {
 		return;
 	}
 
 	const maxSize = 0x3F_FF;
 
-	if (isVP8Lossy(bytes)) {
+	if (chunkType === 'VP8 ') {
 		if (!isValidOffsetToRead(dataView, 28, 2)) {
 			return;
 		}
@@ -76,7 +46,7 @@ export default function webp(bytes) {
 		};
 	}
 
-	if (isLossless) {
+	if (chunkType === 'VP8L') {
 		// The lossless bitstream starts with a 1-byte signature (0x2F) before the packed dimension bits.
 		if (bytes[20] !== 0x2F) {
 			return;
@@ -97,7 +67,7 @@ export default function webp(bytes) {
 		};
 	}
 
-	if (isVP8Extended(bytes)) {
+	if (chunkType === 'VP8X') {
 		if (!isValidOffsetToRead(dataView, 27, 3)) {
 			return;
 		}

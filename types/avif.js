@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffImageSizeFromMeta} from '../utilities.js';
+import {getIsobmffImageDimensions} from '../utilities.js';
 
 // Specification: https://aomediacodec.github.io/av1-avif/v1.1.0.html
 
@@ -9,28 +9,6 @@ const avifBrands = new Set([
 	'avio',
 ]);
 
-const isAvif = bytes => {
-	const brands = getIsobmffFtypBrands(bytes);
-	if (!brands) {
-		return false;
-	}
-
-	return brands.some(brand => avifBrands.has(brand));
-};
-
 export default function avif(bytes) {
-	if (!isAvif(bytes)) {
-		return;
-	}
-
-	const size = getIsobmffImageSizeFromMeta(bytes);
-
-	if (!size) {
-		return;
-	}
-
-	return {
-		...size,
-		type: 'avif',
-	};
+	return getIsobmffImageDimensions(bytes, avifBrands, 'avif');
 }

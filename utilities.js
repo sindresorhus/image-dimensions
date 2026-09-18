@@ -14,6 +14,35 @@ export function getUint16(dataView, offset, littleEndian = false) {
 	}
 }
 
+// Read a 4-character code (4CC) such as a box type or a brand.
+export function getFourCC(bytes, offset) {
+	return String.fromCodePoint(...bytes.subarray(offset, offset + 4));
+}
+
+/*
+Get the dimensions of an ISOBMFF-based image (HEIF/HEIC or AVIF) when its file-type brands match.
+
+Returns {width, height, type} or undefined when the brands do not match or the primary item has no `ispe` property.
+*/
+export function getIsobmffImageDimensions(bytes, brands, type) {
+	const fileBrands = getIsobmffFtypBrands(bytes);
+
+	if (!fileBrands?.some(brand => brands.has(brand))) {
+		return;
+	}
+
+	const size = getIsobmffImageSizeFromMeta(bytes);
+
+	if (!size) {
+		return;
+	}
+
+	return {
+		...size,
+		type,
+	};
+}
+
 /*
 Parse the FileTypeBox (ftyp) at the start of an ISOBMFF container and return an array of 4CC brand strings (major brand first, followed by compatible brands).
 
@@ -29,12 +58,12 @@ export function getIsobmffFtypBrands(bytes) {
 		return;
 	}
 
-	const brands = [];
 	// Major brand
-	brands.push(String.fromCodePoint(...box.data.slice(0, 4)));
+	const brands = [getFourCC(box.data, 0)];
+
 	// Compatible brands start at payload offset 8.
 	for (let i = 8; i + 4 <= box.data.length; i += 4) {
-		brands.push(String.fromCodePoint(...box.data.slice(i, i + 4)));
+		brands.push(getFourCC(box.data, i));
 	}
 
 	return brands;
@@ -52,6 +81,10 @@ export function unboxIsobmffBox(data, offset, {isTopLevel = false} = {}) {
 	let size = getUint32(dataView, offset);
 	let headerSize = 8; // 4 (size) + 4 (type)
 
+	if (size === undefined) {
+		return;
+	}
+
 	// An extended size of 1 means the real size is a 64-bit value following the type (ISO/IEC 14496-12 §4.2.2).
 	if (size === 1) {
 		headerSize += 8;
@@ -68,10 +101,6 @@ export function unboxIsobmffBox(data, offset, {isTopLevel = false} = {}) {
 		size = Number(extendedSize);
 	}
 
-	if (size === undefined) {
-		return;
-	}
-
 	// A size of 0 is only valid for a top-level box and means it extends to the end of the file (ISO/IEC 14496-12 §4.2.2).
 	if (size === 0 && isTopLevel) {
 		size = data.length - offset;
@@ -83,19 +112,10 @@ export function unboxIsobmffBox(data, offset, {isTopLevel = false} = {}) {
 	}
 
 	return {
-		type: String.fromCodePoint(...data.slice(offset + 4, offset + 8)),
-		data: data.slice(offset + headerSize, offset + size),
+		type: getFourCC(data, offset + 4),
+		data: data.subarray(offset + headerSize, offset + size),
 		tail: offset + size,
 	};
-}
-
-/*
-Traverse ISOBMFF boxes to collect image spatial extents from `ispe` properties under the `meta` → `iprp` → `ipco` hierarchy.
-
-Applicable to HEIF/HEIC and AVIF; codec-agnostic within ISOBMFF.
-*/
-export function getIsobmffIspeSizesFromMeta(data) {
-	return getIsobmffMetaInfo(data).sizes.map(({width, height}) => ({width, height}));
 }
 
 /*
@@ -105,8 +125,14 @@ Follows the primary item (`pitm`) to its `ispe` property via the item-to-propert
 
 Returns {width, height} or undefined when the primary item has no `ispe` property.
 */
-export function getIsobmffImageSizeFromMeta(data) {
-	const {sizes, primaryItemId, associations} = getIsobmffMetaInfo(data);
+function getIsobmffImageSizeFromMeta(data) {
+	const meta = findIsobmffTopLevelBox(data, 'meta');
+
+	if (!meta) {
+		return;
+	}
+
+	const {sizes, primaryItemId, associations} = parseIsobmffMetaBox(meta.data);
 
 	// Property indices in `ipma` are 1-based over `ipco` children.
 	const primaryAssociations = new Set(associations
@@ -124,28 +150,22 @@ export function getIsobmffImageSizeFromMeta(data) {
 	};
 }
 
-function getIsobmffMetaInfo(data) {
+function findIsobmffTopLevelBox(data, type) {
 	let offset = 0;
 
 	while (offset < data.length) {
 		const box = unboxIsobmffBox(data, offset, {isTopLevel: true});
 
 		if (!box) {
-			break;
+			return;
 		}
 
-		if (box.type === 'meta') {
-			return parseIsobmffMetaBox(box.data);
+		if (box.type === type) {
+			return box;
 		}
 
 		offset = box.tail;
 	}
-
-	return {
-		sizes: [],
-		primaryItemId: undefined,
-		associations: [],
-	};
 }
 
 // Parses `meta` box
@@ -297,21 +317,4 @@ function parseIsobmffIpcoBox(data, info) {
 
 		offset = box.tail;
 	}
-}
-
-/*
-Return the size with the largest area from a list of {width, height}.
-
-Generic helper used by HEIF/HEIC and AVIF readers.
-*/
-export function getLargestAreaSize(sizes) {
-	let maxSize = sizes[0];
-
-	for (const size of sizes) {
-		if (size.width * size.height > maxSize.width * maxSize.height) {
-			maxSize = size;
-		}
-	}
-
-	return maxSize;
 }

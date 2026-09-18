@@ -1,4 +1,4 @@
-import {getIsobmffFtypBrands, getIsobmffImageSizeFromMeta} from '../utilities.js';
+import {getIsobmffImageDimensions} from '../utilities.js';
 
 // HEIC/HEIF format specification: ISO/IEC 23008-12
 
@@ -16,28 +16,6 @@ const heifBrands = new Set([
 	'hevs',
 ]);
 
-const isHeic = bytes => {
-	const brands = getIsobmffFtypBrands(bytes);
-	if (!brands) {
-		return false;
-	}
-
-	return brands.some(brand => heifBrands.has(brand));
-};
-
 export default function heic(bytes) {
-	if (!isHeic(bytes)) {
-		return;
-	}
-
-	const size = getIsobmffImageSizeFromMeta(bytes);
-
-	if (!size) {
-		return;
-	}
-
-	return {
-		...size,
-		type: 'heic',
-	};
+	return getIsobmffImageDimensions(bytes, heifBrands, 'heic');
 }

@@ -36,8 +36,8 @@ export default function png(bytes) {
 		return;
 	}
 
-	const width = getUint32(dataView, chunkTypeOffset + 4, false);
-	const height = getUint32(dataView, chunkTypeOffset + 8, false);
+	const width = getUint32(dataView, chunkTypeOffset + 4);
+	const height = getUint32(dataView, chunkTypeOffset + 8);
 
 	if (width === undefined || height === undefined) {
 		return;
