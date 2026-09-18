@@ -132,6 +132,11 @@ test('avif', t => {
 	matches(t, 'avif/valid.avif', {width: 30, height: 20, type: 'avif'});
 });
 
+test('avif - meta box with size 0', t => {
+	// Fixture from libavif's test suite (draw_points_idat_metasize0.avif): its `meta` box is the last top-level box and uses size 0, meaning it extends to the end of the file.
+	matches(t, 'avif/metasize0.avif', {width: 33, height: 11, type: 'avif'});
+});
+
 test('heic', t => {
 	matches(t, 'heic/valid.heic', {width: 8, height: 10, type: 'heic'});
 	// Returns raw pixel dimensions (orientation not applied)

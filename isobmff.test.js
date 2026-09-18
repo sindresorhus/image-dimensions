@@ -93,6 +93,15 @@ for (const brand of ['heic', 'avif']) {
 			t.is(imageDimensionsFromData(data.subarray(0, length)), undefined);
 		}
 	});
+
+	test(`${brand} nested size-0 box is invalid`, t => {
+		// A size of 0 is only valid for the last top-level box (ISO/IEC 14496-12 §4.2.2).
+		const data = image({brand});
+		// Overwrite the size field of the `ipma` box (nested inside `meta` → `iprp`).
+		const ipmaOffset = data.indexOf(Buffer.from('ipma'));
+		data.writeUInt32BE(0, ipmaOffset - 4);
+		t.is(imageDimensionsFromData(data), undefined);
+	});
 }
 
 // Each fixture uses a 64-bit size for one box; its item data offset is adjusted to preserve the original image.

@@ -47,7 +47,7 @@ Returns an object with {type, data, tail} or undefined if invalid.
 
 Applicable to ISOBMFF-based image formats like HEIF/HEIC and AVIF.
 */
-export function unboxIsobmffBox(data, offset) {
+export function unboxIsobmffBox(data, offset, {isTopLevel = false} = {}) {
 	const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
 	let size = getUint32(dataView, offset);
 	let headerSize = 8; // 4 (size) + 4 (type)
@@ -70,6 +70,11 @@ export function unboxIsobmffBox(data, offset) {
 
 	if (size === undefined) {
 		return;
+	}
+
+	// A size of 0 is only valid for a top-level box and means it extends to the end of the file (ISO/IEC 14496-12 §4.2.2).
+	if (size === 0 && isTopLevel) {
+		size = data.length - offset;
 	}
 
 	// Size includes the header
@@ -123,7 +128,7 @@ function getIsobmffMetaInfo(data) {
 	let offset = 0;
 
 	while (offset < data.length) {
-		const box = unboxIsobmffBox(data, offset);
+		const box = unboxIsobmffBox(data, offset, {isTopLevel: true});
 
 		if (!box) {
 			break;
