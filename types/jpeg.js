@@ -8,13 +8,13 @@ const isFrameMarker = marker =>
 	&& marker !== 0xFF_C8
 	&& marker !== 0xFF_CC;
 
-const jsJpeg = bytes =>
+const isJpeg = bytes =>
 	bytes[0] === 0xFF
 	&& bytes[1] === 0xD8
 	&& bytes[2] === 0xFF;
 
 export default function jpeg(bytes) {
-	if (!jsJpeg(bytes)) {
+	if (!isJpeg(bytes)) {
 		return;
 	}
 
@@ -23,8 +23,8 @@ export default function jpeg(bytes) {
 	let offset = 2; // Start after the SOI marker.
 
 	while (isValidOffsetToRead(dataView, offset, 2)) {
-		// Skip fill bytes (0xFF) which may precede any marker.
-		if (dataView.getUint8(offset) === 0xFF && dataView.getUint8(offset + 1) === 0xFF) {
+		// A marker is 0xFF followed by a non-0xFF byte. Skip fill bytes (0xFF) and any extraneous bytes before it, like libjpeg does.
+		if (dataView.getUint8(offset) !== 0xFF || dataView.getUint8(offset + 1) === 0xFF) {
 			offset++;
 			continue;
 		}
@@ -37,9 +37,14 @@ export default function jpeg(bytes) {
 			continue;
 		}
 
+		// SOS starts the entropy-coded data, which cannot be skipped by segment length. A frame header must precede it, so stop here instead of misreading scan data as markers.
+		if (marker === 0xFF_DA) {
+			return;
+		}
+
 		if (isFrameMarker(marker)) {
-			const height = getUint16(dataView, offset + 3, false);
-			const width = getUint16(dataView, offset + 5, false);
+			const height = getUint16(dataView, offset + 3);
+			const width = getUint16(dataView, offset + 5);
 
 			if (height === undefined || width === undefined) {
 				return;
